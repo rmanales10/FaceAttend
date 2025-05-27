@@ -1,0 +1,36 @@
+{
+    "hosting": {
+        "public": "build/web",
+        "ignore": [
+            "firebase.json",
+            "**/.*",
+            "**/node_modules/**"
+        ],
+        "rewrites": [
+            {
+                "source": "**",
+                "destination": "/index.html"
+            }
+        ]
+    },
+    "flutter": {
+        "platforms": {
+            "android": {
+                "default": {
+                    "projectId": "tapattend-59d1e",
+                    "appId": "1:548422878639:android:7ba5a94e87d13a0f9c1b5a",
+                    "fileOutput": "android/app/google-services.json"
+                }
+            },
+            "dart": {
+                "lib/firebase_options.dart": {
+                    "projectId": "tapattend-59d1e",
+                    "configurations": {
+                        "android": "1:548422878639:android:7ba5a94e87d13a0f9c1b5a",
+                        "web": "1:548422878639:web:9adb11c090366c799c1b5a"
+                    }
+                }
+            }
+        }
+    }
+}

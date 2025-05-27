@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "548422878639",
+    "project_id": "tapattend-59d1e",
+    "storage_bucket": "tapattend-59d1e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:548422878639:android:7ba5a94e87d13a0f9c1b5a",
+        "android_client_info": {
+          "package_name": "com.example.app_attend"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCPcokehV9POWMbJwSaU_M0OZuk8qASH-o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
