@@ -2,6 +2,7 @@ import 'package:app_attend/src/user/dashboard/list_screen/attendance/attendance_
 import 'package:app_attend/src/user/dashboard/list_screen/attendance/create_attendance/create_attendance.dart';
 import 'package:app_attend/src/user/dashboard/list_screen/attendance/student_list/list_of_students.dart';
 import 'package:app_attend/src/widgets/color_constant.dart';
+import 'package:app_attend/src/widgets/snackbar_utils.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -331,7 +332,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               await _controller.deleteAttendanceRecord(
                   attendanceId, isSubmitted);
               Get.back(closeOverlays: true);
-              Get.snackbar('Success', 'Attendance deleted successfully.');
+              showSuccess(message: 'Attendance deleted successfully.');
             },
             child: const Text('Yes'),
           ),

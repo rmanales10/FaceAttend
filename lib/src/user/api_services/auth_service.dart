@@ -1,3 +1,4 @@
+import 'package:app_attend/src/widgets/snackbar_utils.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
@@ -55,11 +56,10 @@ class AuthService extends GetxController {
       await addOrUpdateActivityLog(userCredential.user!.uid, email, ipAddress,
           'Registered', 'User registered successfully.');
 
-      Get.snackbar('Success', 'Account created! Please verify your email.',
-          snackPosition: SnackPosition.TOP);
+      showSuccess(message: 'Account created! Please verify your email.');
       Get.toNamed('/login'); // Navigate to the login page
     } catch (e) {
-      Get.snackbar('Error', e.toString(), snackPosition: SnackPosition.TOP);
+      showError(message: e.toString());
     }
   }
 
@@ -84,19 +84,16 @@ class AuthService extends GetxController {
         await addOrUpdateActivityLog(userCredential.user!.uid, email, ipAddress,
             'Online', 'User logged in successfully.');
 
-        Get.snackbar('Success', 'Logged in successfully!',
-            snackPosition: SnackPosition.TOP);
+        showSuccess(message: 'Logged in successfully!');
         Get.offAllNamed('/dashboard'); // Navigate to the dashboard page
       } else {
         // Sign out the user if email is not verified
         await _auth.signOut();
-        Get.snackbar('Error', 'Please verify your email first!',
-            snackPosition: SnackPosition.TOP);
+        showError(message: 'Please verify your email first!');
         isLoggin.value = false;
       }
     } catch (e) {
-      Get.snackbar('Error', 'Incorrect Email or Password',
-          snackPosition: SnackPosition.TOP);
+      showError(message: 'Incorrect Email or Password');
       isLoggin.value = false;
     }
   }
@@ -107,12 +104,10 @@ class AuthService extends GetxController {
       User? user = _auth.currentUser;
       if (user != null && !user.emailVerified) {
         await user.sendEmailVerification();
-        Get.snackbar('Success', 'Verification email sent!',
-            snackPosition: SnackPosition.TOP);
+        showSuccess(message: 'Verification email sent!');
       }
     } catch (e) {
-      Get.snackbar('Error', 'Failed to send verification email',
-          snackPosition: SnackPosition.TOP);
+      showError(message: 'Failed to send verification email');
     }
   }
 
@@ -131,13 +126,11 @@ class AuthService extends GetxController {
             ipAddress, 'Offline', 'User logged out.');
 
         await _auth.signOut();
-        Get.snackbar('Success', 'User Logged out successfully!',
-            snackPosition: SnackPosition.TOP);
+        showSuccess(message: 'User Logged out successfully!');
         Get.offAllNamed('/welcome'); // Navigate to the welcome page
       }
     } catch (e) {
-      Get.snackbar('Error', 'An error occurred while logging out.',
-          snackPosition: SnackPosition.TOP);
+      showError(message: 'An error occurred while logging out.');
     }
   }
 
@@ -145,11 +138,9 @@ class AuthService extends GetxController {
   Future<void> resetPassword(String email) async {
     try {
       await _auth.sendPasswordResetEmail(email: email.trim());
-      Get.snackbar('Success', 'Password reset email sent! Check your inbox.',
-          snackPosition: SnackPosition.TOP);
+      showSuccess(message: 'Password reset email sent! Check your inbox.');
     } catch (e) {
-      Get.snackbar('Error', 'Please check your connection!',
-          snackPosition: SnackPosition.TOP);
+      showError(message: 'Please check your connection!');
     }
   }
 
@@ -163,8 +154,7 @@ class AuthService extends GetxController {
         'lastIPAddress': ipAddress,
       });
     } catch (e) {
-      Get.snackbar('Error', 'Failed to update user status.',
-          snackPosition: SnackPosition.TOP);
+      showError(message: 'Failed to update user status.');
     }
   }
 
@@ -185,8 +175,7 @@ class AuthService extends GetxController {
               merge:
                   true)); // Merge so existing data is not overwritten but updated
     } catch (e) {
-      Get.snackbar('Error', 'Failed to log user activity.',
-          snackPosition: SnackPosition.TOP);
+      showError(message: 'Failed to log user activity.'); 
     }
   }
 }

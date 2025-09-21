@@ -1,3 +1,4 @@
+import 'package:app_attend/src/widgets/snackbar_utils.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -31,7 +32,7 @@ class ActivityLogController extends GetxController {
         };
       }).toList();
     } catch (e) {
-      Get.snackbar('Error', 'Failed to retrieve activity logs');
+      showError(message: 'Failed to retrieve activity logs');
     }
   }
 

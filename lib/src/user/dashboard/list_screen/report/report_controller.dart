@@ -1,3 +1,4 @@
+import 'package:app_attend/src/widgets/snackbar_utils.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
@@ -52,7 +53,7 @@ class ReportController extends GetxController {
       // Initially, filtered reports match all reports
       filteredReports.value = reports;
     } catch (e) {
-      Get.snackbar('Error', 'Failed to fetch reports: $e');
+      showError(message: 'Failed to fetch reports: $e');
     }
   }
 

@@ -50,20 +50,21 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyARBfuxtzSp9jQ5EZaLKoJegwgeFGgR8WQ',
-    appId: '1:548422878639:web:9adb11c090366c799c1b5a',
-    messagingSenderId: '548422878639',
-    projectId: 'tapattend-59d1e',
-    authDomain: 'tapattend-59d1e.firebaseapp.com',
-    storageBucket: 'tapattend-59d1e.firebasestorage.app',
-    measurementId: 'G-4PCQRNX76F',
+    apiKey: 'AIzaSyBY4Pz1cQ383tWjUceIxMoQg4swL0Bb2LM',
+    appId: '1:538722686749:web:2caac5ea17c7870e7ef3f4',
+    messagingSenderId: '538722686749',
+    projectId: 'faceattend-5a5ac',
+    authDomain: 'faceattend-5a5ac.firebaseapp.com',
+    storageBucket: 'faceattend-5a5ac.firebasestorage.app',
+    measurementId: 'G-E41KRCLR72',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCPcokehV9POWMbJwSaU_M0OZuk8qASH-o',
-    appId: '1:548422878639:android:7ba5a94e87d13a0f9c1b5a',
-    messagingSenderId: '548422878639',
-    projectId: 'tapattend-59d1e',
-    storageBucket: 'tapattend-59d1e.firebasestorage.app',
+    apiKey: 'AIzaSyAel_22IPi5OPO7m37Tsaviuh5aiYmSZWg',
+    appId: '1:538722686749:android:4ea184d80fd4860f7ef3f4',
+    messagingSenderId: '538722686749',
+    projectId: 'faceattend-5a5ac',
+    storageBucket: 'faceattend-5a5ac.firebasestorage.app',
   );
+
 }

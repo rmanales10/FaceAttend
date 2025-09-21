@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:app_attend/src/user/api_services/auth_service.dart';
 import 'package:app_attend/src/user/dashboard/list_screen/profile/profile_controller.dart';
 import 'package:app_attend/src/widgets/color_constant.dart';
+import 'package:app_attend/src/widgets/snackbar_utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -35,13 +36,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            buildProfileHeader(size),
-            buildPersonalDetailsSection(),
-            buildActionsSection(),
-          ],
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.blue[50]!, Colors.white],
+          ),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                buildProfileHeader(size),
+                buildPersonalDetailsSection(),
+                buildActionsSection(),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -62,120 +74,128 @@ class _ProfileScreenState extends State<ProfileScreen> {
           bottomRight: Radius.circular(30),
         ),
       ),
-      child: SafeArea(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                Obx(() {
-                  _controller.fetchUserInfo();
-                  final imageString = _controller.userInfo['base64image'];
-                  Uint8List? profileImageBytes;
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              Obx(() {
+                _controller.fetchUserInfo();
+                final imageString = _controller.userInfo['base64image'];
+                Uint8List? profileImageBytes;
 
-                  if (imageString != null && imageString.isNotEmpty) {
-                    try {
-                      profileImageBytes = base64Decode(imageString);
-                    } catch (e) {
-                      log('Error decoding image string: $e');
-                    }
+                if (imageString != null && imageString.isNotEmpty) {
+                  try {
+                    profileImageBytes = base64Decode(imageString);
+                  } catch (e) {
+                    log('Error decoding image string: $e');
                   }
+                }
 
-                  return Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 4),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 10,
-                          spreadRadius: 5,
-                        ),
-                      ],
-                    ),
-                    child: ClipOval(
-                      child: profileImageBytes == null
-                          ? Icon(
-                              Icons.person,
-                              size: 80,
-                              color: Colors.white,
-                            )
-                          : Image.memory(
-                              profileImageBytes,
-                              fit: BoxFit.cover,
-                              gaplessPlayback: true,
-                            ),
-                    ),
-                  );
-                }),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 5,
-                          spreadRadius: 1,
-                        ),
-                      ],
-                    ),
-                    child: IconButton(
-                      onPressed: pickImageAndProcess,
-                      icon: Icon(
-                        Icons.camera_alt,
-                        color: blue,
-                        size: 20,
+                return Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 4),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 10,
+                        spreadRadius: 5,
                       ),
+                    ],
+                  ),
+                  child: ClipOval(
+                    child: profileImageBytes == null
+                        ? Icon(
+                            Icons.person,
+                            size: 80,
+                            color: Colors.white,
+                          )
+                        : Image.memory(
+                            profileImageBytes,
+                            fit: BoxFit.cover,
+                            gaplessPlayback: true,
+                          ),
+                  ),
+                );
+              }),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 5,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: IconButton(
+                    onPressed: pickImageAndProcess,
+                    icon: Icon(
+                      Icons.camera_alt,
+                      color: blue,
+                      size: 20,
                     ),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Obx(() {
-              _controller.fetchUserInfo();
-              return Text(
-                '${_controller.userInfo['fullname'] ?? ''}',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              );
-            }),
-            const SizedBox(height: 5),
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(20),
               ),
-              child: Text(
-                'Instructor',
-                style: TextStyle(fontSize: 16, color: Colors.white),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Obx(() {
+            _controller.fetchUserInfo();
+            return Text(
+              '${_controller.userInfo['fullname'] ?? ''}',
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
               ),
+            );
+          }),
+          const SizedBox(height: 5),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
             ),
-          ],
-        ),
+            child: Text(
+              'Instructor',
+              style: TextStyle(fontSize: 16, color: Colors.white),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget buildPersonalDetailsSection() {
     return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              spreadRadius: 1,
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
@@ -260,7 +280,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget buildActionsSection() {
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -290,17 +310,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [color, color.withOpacity(0.8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(15),
+        color: color,
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: color.withOpacity(0.3),
+            spreadRadius: 1,
             blurRadius: 8,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -311,7 +328,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           label,
           style: TextStyle(
             fontSize: 16,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w600,
             color: Colors.white,
           ),
         ),
@@ -319,9 +336,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           backgroundColor: Colors.transparent,
           foregroundColor: Colors.white,
           shadowColor: Colors.transparent,
-          padding: EdgeInsets.symmetric(vertical: 16),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
+            borderRadius: BorderRadius.circular(16),
           ),
         ),
       ),
@@ -375,13 +392,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _resetPassword() {
     _controller.resetPass(email: emailController.text);
-    Get.snackbar(
-      'Reset Password',
-      'Password reset link has been sent to your email.',
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.blueAccent,
-      colorText: Colors.white,
-    );
+    showSuccess(message: 'Password reset link has been sent to your email.');
   }
 
   Future<void> pickImageAndProcess() async {

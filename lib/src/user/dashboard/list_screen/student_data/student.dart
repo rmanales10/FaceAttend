@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:app_attend/src/user/dashboard/list_screen/student_data/student_controller.dart';
 import 'package:app_attend/src/widgets/color_constant.dart';
+import 'package:app_attend/src/widgets/snackbar_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
@@ -320,19 +321,13 @@ class _StudentState extends State<Student> {
                                         fullName, imageBase64!, selectedClass);
                                 if (saved) {
                                   Navigator.of(context).pop();
-                                  Get.snackbar(
-                                      'Success', 'Student added successfully',
-                                      backgroundColor: Colors.green,
-                                      colorText: Colors.white);
+                                  showSuccess(
+                                      message: 'Student added successfully');
                                 } else {
-                                  Get.snackbar('Error', 'Failed to add student',
-                                      backgroundColor: Colors.red,
-                                      colorText: Colors.white);
+                                  showError(message: 'Failed to add student');
                                 }
                               } else {
-                                Get.snackbar('Error', 'Please fill all fields',
-                                    backgroundColor: Colors.red,
-                                    colorText: Colors.white);
+                                showError(message: 'Please fill all fields');
                               }
                             },
                             style: ElevatedButton.styleFrom(

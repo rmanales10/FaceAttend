@@ -1,5 +1,6 @@
 import 'package:app_attend/src/user/dashboard/list_screen/report/report_controller.dart';
 import 'package:app_attend/src/widgets/color_constant.dart';
+import 'package:app_attend/src/widgets/snackbar_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -13,63 +14,73 @@ class ReportScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Generated Reports',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: blue,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.blue[50]!, Colors.white],
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Generated Reports',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: blue,
+                    letterSpacing: 0.5,
+                  ),
                 ),
-              ),
-              SizedBox(height: 20),
-              _buildSearchBar(),
-              SizedBox(height: 20),
-              Expanded(
-                child: Obx(() {
-                  _controller.getReports();
-                  final reports = _controller.filteredReports;
+                const SizedBox(height: 24),
+                _buildSearchBar(),
+                const SizedBox(height: 24),
+                Expanded(
+                  child: Obx(() {
+                    _controller.getReports();
+                    final reports = _controller.filteredReports;
 
-                  if (reports.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.description_outlined,
-                              size: 80, color: Colors.grey[300]),
-                          SizedBox(height: 16),
-                          Text(
-                            'No reports available',
-                            style: TextStyle(
-                                fontSize: 18, color: Colors.grey[600]),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  return ListView.builder(
-                    itemCount: reports.length,  
-                    itemBuilder: (context, index) {
-                      final report = reports[index];
-                      return _buildReportCard(
-                        sectionLabel:
-                            '${report['subject']}\n${report['section']}',
-                        date: '${report['date']}',
-                        fileType: '${report['type']}',
-                        url: '${report['url']}',
-                        id: report['attendance_id'],
+                    if (reports.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.description_outlined,
+                                size: 80, color: Colors.grey[300]),
+                            SizedBox(height: 16),
+                            Text(
+                              'No reports available',
+                              style: TextStyle(
+                                  fontSize: 18, color: Colors.grey[600]),
+                            ),
+                          ],
+                        ),
                       );
-                    },
-                  );
-                }),
-              ),
-            ],
+                    }
+
+                    return ListView.builder(
+                      itemCount: reports.length,
+                      itemBuilder: (context, index) {
+                        final report = reports[index];
+                        return _buildReportCard(
+                          sectionLabel:
+                              '${report['subject']}\n${report['section']}',
+                          date: '${report['date']}',
+                          fileType: '${report['type']}',
+                          url: '${report['url']}',
+                          id: report['attendance_id'],
+                        );
+                      },
+                    );
+                  }),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -78,17 +89,15 @@ class ReportScreen extends StatelessWidget {
 
   Widget _buildSearchBar() {
     return Container(
-      width: 250,
-      height: 50,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(25),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
+            color: Colors.grey.withOpacity(0.1),
             spreadRadius: 1,
-            blurRadius: 5,
-            offset: Offset(0, 3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -96,19 +105,28 @@ class ReportScreen extends StatelessWidget {
         controller: _searchController,
         decoration: InputDecoration(
           hintText: 'Search reports...',
-          hintStyle: TextStyle(color: Colors.grey[400]),
-          prefixIcon: Icon(Icons.search, color: blue),
+          hintStyle: TextStyle(
+            color: Colors.grey[600],
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
+          prefixIcon: Icon(Icons.search, color: blue, size: 24),
           suffixIcon: IconButton(
-            icon: Icon(Icons.clear, color: Colors.grey[400]),
+            icon: Icon(Icons.clear, color: Colors.grey[400], size: 20),
             onPressed: () {
               _searchController.clear();
               _controller.updateSearchQuery('');
             },
           ),
           border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         ),
-        style: TextStyle(color: blue, fontSize: 16),
+        style: TextStyle(
+          color: blue,
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+        ),
         onChanged: (query) {
           _controller.updateSearchQuery(query);
         },
@@ -123,58 +141,58 @@ class ReportScreen extends StatelessWidget {
     required String url,
     required String id,
   }) {
-    return Card(
-      elevation: 3,
-      margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 5),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [blue.withOpacity(0.1), blue.withOpacity(0.05)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
-          borderRadius: BorderRadius.circular(15),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      sectionLabel,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: blue,
-                      ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    sectionLabel,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: blue,
+                      letterSpacing: 0.3,
                     ),
                   ),
-                  _buildActionButton(Icons.download, Colors.green, () {
-                    final Uri downloadLink = Uri.parse(url);
-                    launchUrl(downloadLink,
-                        mode: LaunchMode.externalApplication);
-                  }),
-                  SizedBox(width: 10),
-                  _buildActionButton(Icons.delete, Colors.red, () {
-                    _showDeleteConfirmation(id);
-                  }),
-                ],
-              ),
-              SizedBox(height: 10),
-              Row(
-                children: [
-                  _buildInfoChip(Icons.calendar_today, date),
-                  SizedBox(width: 10),
-                  _buildInfoChip(Icons.file_present, fileType),
-                ],
-              ),
-            ],
-          ),
+                ),
+                _buildActionButton(Icons.download, Colors.green, () {
+                  final Uri downloadLink = Uri.parse(url);
+                  launchUrl(downloadLink, mode: LaunchMode.externalApplication);
+                }),
+                SizedBox(width: 10),
+                _buildActionButton(Icons.delete, Colors.red, () {
+                  _showDeleteConfirmation(id);
+                }),
+              ],
+            ),
+            SizedBox(height: 10),
+            Row(
+              children: [
+                _buildInfoChip(Icons.calendar_today, date),
+                SizedBox(width: 10),
+                _buildInfoChip(Icons.file_present, fileType),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -204,12 +222,13 @@ class ReportScreen extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: EdgeInsets.all(8),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withOpacity(0.3), width: 1),
           ),
           child: Icon(icon, color: color, size: 20),
         ),
@@ -233,7 +252,7 @@ class ReportScreen extends StatelessWidget {
             onPressed: () async {
               await _controller.deleteReports(id);
               Get.back();
-              Get.snackbar('Success', 'Report deleted successfully!');
+              showSuccess(message: 'Report deleted successfully!');
             },
             child: Text('Delete', style: TextStyle(color: Colors.red)),
           ),

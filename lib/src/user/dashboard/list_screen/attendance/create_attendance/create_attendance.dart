@@ -1,4 +1,5 @@
 import 'package:app_attend/src/user/dashboard/list_screen/attendance/create_attendance/create_controller.dart';
+import 'package:app_attend/src/widgets/snackbar_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -394,9 +395,8 @@ class _CreateAttendanceState extends State<CreateAttendance> {
       );
 
       Get.back();
-      Get.snackbar(
-        'Success',
-        'Attendance created successfully!',
+      showSuccess(
+        message: 'Attendance created successfully!',
       );
     } catch (e) {
       _showErrorSnackbar('Failed to create attendance: ${e.toString()}');
@@ -406,12 +406,6 @@ class _CreateAttendanceState extends State<CreateAttendance> {
   }
 
   void _showErrorSnackbar(String message) {
-    Get.snackbar(
-      'Error',
-      message,
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.red,
-      colorText: Colors.white,
-    );
+    showError(message: message);
   }
 }

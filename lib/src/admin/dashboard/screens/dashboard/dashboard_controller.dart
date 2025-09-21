@@ -4,7 +4,7 @@ import 'dart:math' as rnd;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
 
-class HomeController extends GetxController {
+class DashboardController extends GetxController {
   final _firestore = FirebaseFirestore.instance;
   final totalTeacher = 0.obs;
   final totalSubject = 0.obs;

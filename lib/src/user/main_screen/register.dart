@@ -1,6 +1,7 @@
 import 'package:app_attend/src/user/api_services/auth_service.dart';
 import 'package:app_attend/src/widgets/color_constant.dart';
 import 'package:app_attend/src/widgets/reusable_function.dart';
+import 'package:app_attend/src/widgets/snackbar_utils.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -29,11 +30,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           passwordController.text, '09${phoneController.text}');
       isClick.value = true;
     } else {
-      Get.snackbar(
-        'Error',
-        'You must accept the Terms and Privacy Policy to register.',
-        snackPosition: SnackPosition.TOP,
-      );
+      showError(
+          message: 'You must accept the Terms and Privacy Policy to register.');
     }
   }
 

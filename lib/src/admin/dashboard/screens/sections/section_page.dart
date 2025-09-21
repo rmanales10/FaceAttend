@@ -1,3 +1,4 @@
+import 'package:app_attend/src/widgets/snackbar_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -24,7 +25,7 @@ class SectionPage extends StatelessWidget {
             section: section.text);
         _firestore.getAllStudent();
         Get.back(closeOverlays: true);
-        // Get.snackbar('Success', 'Student added successfully');
+        showSuccess(message: 'Student added successfully');
         fullName.clear();
         idNumber.clear();
         section.clear();
@@ -194,7 +195,7 @@ class SectionPage extends StatelessWidget {
                                       onPressed: () {
                                         _firestore.deleteStudent(user['id']);
                                         Get.back(closeOverlays: true);
-                                        Get.snackbar('Success',
+                                        showSuccess(message:
                                             'User deleted successfully');
                                         _firestore.getAllStudent();
                                       },
