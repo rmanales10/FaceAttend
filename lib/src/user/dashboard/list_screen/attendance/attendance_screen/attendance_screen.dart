@@ -19,6 +19,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   final _controller = Get.put(AttendanceController());
 
   @override
+  void initState() {
+    super.initState();
+    _controller.getAllAttendance();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
@@ -59,13 +65,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
               const SizedBox(height: 24),
               Expanded(
                 child: Obx(() {
-                  _controller.getAllAttendance();
-
                   if (_controller.allAttendance.isEmpty) {
                     return _buildEmptyState();
                   }
 
-                  return _buildAttendanceList();
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      await _controller.refreshAttendance();
+                    },
+                    child: _buildAttendanceList(),
+                  );
                 }),
               ),
             ],
@@ -228,6 +237,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 attendanceId: record['id'],
                 isSubmitted: record['is_submitted'],
                 isAsynchronous: record['is_asynchronous'] ?? false,
+                subjectId: record['class_schedule']?['subject_id'] ?? '',
               )),
           onDelete: () => _confirmDelete(record['id'], record['is_submitted']),
         );

@@ -16,6 +16,7 @@ class ListOfStudents extends StatefulWidget {
   final String attendanceId;
   final bool isSubmitted;
   final bool isAsynchronous;
+  final String subjectId;
 
   const ListOfStudents({
     super.key,
@@ -25,6 +26,7 @@ class ListOfStudents extends StatefulWidget {
     required this.attendanceId,
     required this.isSubmitted,
     required this.isAsynchronous,
+    required this.subjectId,
   });
 
   @override
@@ -40,6 +42,46 @@ class _ListOfStudentsState extends State<ListOfStudents> {
       <Map<String, dynamic>>[].obs;
 
   final RxList<bool> isPresent = <bool>[].obs;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStudents();
+  }
+
+  Future<void> _loadStudents() async {
+    log('Loading students with:');
+    log('Subject ID: ${widget.subjectId}');
+    log('Section: ${widget.section}');
+    log('Subject: ${widget.subject}');
+
+    if (widget.subjectId.isNotEmpty) {
+      await _controller.getStudentsList(
+        section: widget.section,
+        subject: widget.subject,
+        subjectId: widget.subjectId,
+      );
+
+      log('Controller student list length: ${_controller.studentList.length}');
+
+      // Initialize attendance status for each student (using growable list)
+      isPresent.value =
+          List.generate(_controller.studentList.length, (_) => false);
+      // Initialize student records
+      studentRecord.clear();
+      for (var student in _controller.studentList) {
+        studentRecord.add({
+          'id': student['id'],
+          'name': student['full_name'] ?? student['name'],
+          'present': 'X',
+        });
+      }
+
+      log('Student records initialized: ${studentRecord.length}');
+    } else {
+      log('Subject ID is empty, cannot load students');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -109,13 +151,11 @@ class _ListOfStudentsState extends State<ListOfStudents> {
                 const SizedBox(height: 24),
                 Expanded(
                   child: Obx(() {
-                    _controller.getStudentsList(
-                        section: widget.section, subject: widget.subject);
                     final studentList = _controller.studentList;
 
                     if (isPresent.isEmpty) {
-                      isPresent.addAll(
-                          List.generate(studentList.length, (_) => false));
+                      isPresent.value =
+                          List.generate(studentList.length, (_) => false);
                     }
 
                     _controller.printAttendanceStudentRecord(
@@ -136,7 +176,7 @@ class _ListOfStudentsState extends State<ListOfStudents> {
                         return _buildScrollableTable(studentPrintList, size);
                       }
                     }
-                    return _buildScrollableTable(studentList, size);
+                    return _buildScrollableTable(_controller.studentList, size);
                   }),
                 ),
                 if (!widget.isSubmitted)
@@ -159,7 +199,7 @@ class _ListOfStudentsState extends State<ListOfStudents> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) =>  FaceRecognitionPage(),
+                            builder: (context) => FaceRecognitionPage(),
                           ),
                         );
                       },
@@ -282,6 +322,7 @@ class _ListOfStudentsState extends State<ListOfStudents> {
 
               if (studentRecord.length < data.length) {
                 studentRecord.add({
+                  'id': student['id'],
                   'name': student['full_name'] ?? student['name'],
                   'present': isPresent[index] == false ? 'X' : '✓',
                 });

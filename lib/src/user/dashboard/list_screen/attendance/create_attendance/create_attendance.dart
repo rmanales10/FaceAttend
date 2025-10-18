@@ -1,4 +1,5 @@
 import 'package:app_attend/src/user/dashboard/list_screen/attendance/create_attendance/create_controller.dart';
+import 'package:app_attend/src/user/dashboard/list_screen/attendance/attendance_screen/attendance_controller.dart';
 import 'package:app_attend/src/widgets/snackbar_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -313,6 +314,8 @@ class _CreateAttendanceState extends State<CreateAttendance> {
       showSuccess(
         message: 'Attendance created successfully!',
       );
+      // Refresh attendance list
+      Get.find<AttendanceController>().refreshAttendance();
     } catch (e) {
       _showErrorSnackbar('Failed to create attendance: ${e.toString()}');
     } finally {

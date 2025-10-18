@@ -40,6 +40,10 @@ class AttendanceController extends GetxController {
     }
   }
 
+  Future<void> refreshAttendance() async {
+    await getAllAttendance();
+  }
+
   Future<void> deleteAttendanceRecord(var attendanceId, var isSubmitted) async {
     try {
       if (!isSubmitted) {

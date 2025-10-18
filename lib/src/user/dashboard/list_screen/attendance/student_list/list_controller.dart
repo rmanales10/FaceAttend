@@ -19,25 +19,62 @@ class ListController extends GetxController {
   // Observable student list
   RxList<Map<String, dynamic>> studentList = <Map<String, dynamic>>[].obs;
 
-  // Get the list of students
+  // Get the list of students based on subject
   Future<void> getStudentsList({
     required var section,
     required var subject,
+    required String subjectId,
   }) async {
     try {
-      QuerySnapshot querySnapshot = await _firestore
+      log('Searching for students with:');
+      log('Section: $section');
+      log('Subject: $subject');
+      log('Subject ID: $subjectId');
+
+      // First, let's try without section filter to see if students exist
+      QuerySnapshot allStudentsSnapshot = await _firestore
           .collection('students')
-          .where('section_year_block', isEqualTo: section)
+          .where('subject', arrayContains: subjectId)
           .get();
 
-      studentList.value = querySnapshot.docs
-          .map((doc) => {
-                'id': doc['id'],
-                'section_year_block': doc['section_year_block'],
-                'subject': doc['subject'],
-                'full_name': doc['full_name'],
-              })
-          .toList();
+      log('Found ${allStudentsSnapshot.docs.length} students with subject ID: $subjectId');
+
+      // Debug: Check what fields are available in student documents
+      if (allStudentsSnapshot.docs.isNotEmpty) {
+        var firstStudent = allStudentsSnapshot.docs.first;
+        var studentData = firstStudent.data() as Map<String, dynamic>?;
+        if (studentData != null) {
+          log('First student fields: ${studentData.keys.toList()}');
+          log('First student data: $studentData');
+        }
+      }
+
+      // For now, use all students with the subject since section field doesn't exist
+      // TODO: Add section field to student documents or use a different approach
+      QuerySnapshot querySnapshot = allStudentsSnapshot;
+
+      log('Using all students with subject (section filtering not available)');
+
+      studentList.value = querySnapshot.docs.map((doc) {
+        var data = doc.data() as Map<String, dynamic>;
+        return {
+          'id': doc.id,
+          'section_year_block':
+              data['section_year_block'] ?? data['course_year'] ?? 'Unknown',
+          'subject': data['subject'],
+          'full_name': data['full_name'],
+          'block': data['block'],
+          'department': data['department'],
+          'year_level': data['year_level'],
+          'created_at': data['created_at'],
+          'updated_at': data['updated_at'],
+        };
+      }).toList();
+
+      log('Final student list: ${studentList.length} students');
+      for (var student in studentList) {
+        log('Student: ${student['full_name']}, Section: ${student['section_year_block']}, Block: ${student['block']}');
+      }
     } catch (e) {
       log('Error fetching student list: $e');
     }
