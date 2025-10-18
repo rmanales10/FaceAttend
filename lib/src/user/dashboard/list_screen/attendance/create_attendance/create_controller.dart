@@ -21,7 +21,8 @@ class CreateController extends GetxController {
       required var section,
       required var date,
       required var time,
-      required var isAsynchronous}) async {
+      required var isAsynchronous,
+      required Map<String, dynamic> classSchedule}) async {
     String autoId = generateUniqueId();
     try {
       await _firestore
@@ -37,6 +38,19 @@ class CreateController extends GetxController {
         'subject': subject,
         'is_submitted': false,
         'is_asynchronous': isAsynchronous,
+        'class_schedule_id': classSchedule['id'],
+        'class_schedule': {
+          'subject_id': classSchedule['subject_id'],
+          'subject_name': classSchedule['subject_name'],
+          'course_code': classSchedule['course_code'],
+          'course_year': classSchedule['course_year'],
+          'year_level': classSchedule['year_level'],
+          'schedule': classSchedule['schedule'],
+          'building_room': classSchedule['building_room'],
+          'teacher_id': classSchedule['teacher_id'],
+          'teacher_name': classSchedule['teacher_name'],
+          'department': classSchedule['department'],
+        },
       }, SetOptions(merge: true));
     } catch (e) {
       log('error $e');
@@ -72,5 +86,37 @@ class CreateController extends GetxController {
         .toList();
     log('$subject');
     log('$sections');
+  }
+
+  // Class schedules
+  RxList<Map<String, dynamic>> classSchedules = <Map<String, dynamic>>[].obs;
+  Future<void> fetchAllClassSchedules() async {
+    try {
+      QuerySnapshot querySnapshot =
+          await _firestore.collection('classSchedules').get();
+
+      classSchedules.value = querySnapshot.docs
+          .map((doc) => {
+                'id': doc.id,
+                'subject_id': doc['subject_id'],
+                'subject_name': doc['subject_name'],
+                'course_code': doc['course_code'],
+                'course_year': doc['course_year'],
+                'year_level': doc['year_level'],
+                'schedule': doc['schedule'],
+                'building_room': doc['building_room'],
+                'teacher_id': doc['teacher_id'],
+                'teacher_name': doc['teacher_name'],
+                'department': doc['department'],
+                'created_at': doc['created_at'],
+                'updated_at': doc['updated_at'],
+              })
+          .toList();
+
+      log('Fetched ${classSchedules.length} class schedules');
+    } catch (e) {
+      log('Error fetching class schedules: $e');
+      classSchedules.value = [];
+    }
   }
 }

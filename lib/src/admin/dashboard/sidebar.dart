@@ -2,7 +2,7 @@ import 'package:app_attend/src/admin/dashboard/screens/activity_log/activity_log
 import 'package:app_attend/src/admin/dashboard/screens/dashboard/dashboard.dart';
 import 'package:app_attend/src/admin/dashboard/screens/students/student_page.dart';
 import 'package:app_attend/src/admin/dashboard/screens/subjects/subject_page.dart';
-
+import 'package:app_attend/src/admin/dashboard/screens/student_face_training/student_face_training.dart';
 import 'package:app_attend/src/admin/dashboard/screens/teachers/teacher_page.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -36,6 +36,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
       //   return SectionPage();
       case 'Subjects':
         return SubjectPage();
+      case 'Face Training':
+        return StudentFaceTrainingPage();
       case 'Activity Logs':
         return ActivityLogPage();
       default:
@@ -190,6 +192,13 @@ class Sidebar extends StatelessWidget {
                     'Subjects',
                     isSelected: currentPage == 'Subjects',
                     onTap: () => onPageSelected('Subjects'),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildMenuItem(
+                    Icons.face_retouching_natural,
+                    'Face Training',
+                    isSelected: currentPage == 'Face Training',
+                    onTap: () => onPageSelected('Face Training'),
                   ),
                   const SizedBox(height: 8),
                   _buildMenuItem(

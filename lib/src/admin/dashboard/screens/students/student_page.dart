@@ -2,6 +2,9 @@ import 'package:app_attend/src/admin/dashboard/screens/students/student_controll
 import 'package:app_attend/src/widgets/snackbar_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+enum StudentViewMode { list, grid, compact }
 
 class StudentPage extends StatefulWidget {
   const StudentPage({super.key});
@@ -18,6 +21,7 @@ class _StudentPageState extends State<StudentPage> {
   RxBool isEditStudent = false.obs;
   RxString searchQuery = ''.obs;
   RxList<Map<String, dynamic>> filteredStudents = <Map<String, dynamic>>[].obs;
+  Rx<StudentViewMode> currentViewMode = StudentViewMode.list.obs;
 
   final studentId = ''.obs;
   final name = TextEditingController();
@@ -66,6 +70,7 @@ class _StudentPageState extends State<StudentPage> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    _loadViewPreference();
 
     // Initialize filtered students when allStudents changes
     ever(_controller.allStudents, (_) {
@@ -76,6 +81,17 @@ class _StudentPageState extends State<StudentPage> {
 
     // Fetch students after setting up the listener
     _controller.getAllStudents();
+  }
+
+  Future<void> _loadViewPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    final viewModeIndex = prefs.getInt('student_view_mode') ?? 0;
+    currentViewMode.value = StudentViewMode.values[viewModeIndex];
+  }
+
+  Future<void> _saveViewPreference(StudentViewMode mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('student_view_mode', mode.index);
   }
 
   void _onSearchChanged() {
@@ -191,6 +207,8 @@ class _StudentPageState extends State<StudentPage> {
                   ],
                 ),
               ),
+              _buildViewToggleButtons(),
+              SizedBox(width: 8),
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
@@ -274,6 +292,48 @@ class _StudentPageState extends State<StudentPage> {
     );
   }
 
+  Widget _buildViewToggleButtons() {
+    return Obx(() => Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildViewButton(Icons.list, StudentViewMode.list, 'List View'),
+              _buildViewButton(
+                  Icons.grid_view, StudentViewMode.grid, 'Grid View'),
+              _buildViewButton(
+                  Icons.view_agenda, StudentViewMode.compact, 'Compact View'),
+            ],
+          ),
+        ));
+  }
+
+  Widget _buildViewButton(IconData icon, StudentViewMode mode, String tooltip) {
+    final isSelected = currentViewMode.value == mode;
+    return Container(
+      margin: EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: isSelected ? Colors.white : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: IconButton(
+        onPressed: () {
+          currentViewMode.value = mode;
+          _saveViewPreference(mode);
+        },
+        icon: Icon(
+          icon,
+          color: isSelected ? Color(0xFF667eea) : Colors.white,
+          size: 20,
+        ),
+        tooltip: tooltip,
+      ),
+    );
+  }
+
   Widget _buildStudentsList() {
     return Obx(() {
       if (_controller.allStudents.isEmpty) {
@@ -294,16 +354,59 @@ class _StudentPageState extends State<StudentPage> {
           await _controller.getAllStudents();
           _filterStudents();
         },
-        child: ListView.builder(
-          padding: EdgeInsets.symmetric(horizontal: 20),
-          itemCount: filteredStudents.length,
-          itemBuilder: (context, index) {
-            final student = filteredStudents[index];
-            return _buildStudentCard(student, index + 1);
-          },
-        ),
+        child: _buildStudentsView(),
       );
     });
+  }
+
+  Widget _buildStudentsView() {
+    switch (currentViewMode.value) {
+      case StudentViewMode.list:
+        return _buildListView();
+      case StudentViewMode.grid:
+        return _buildGridView();
+      case StudentViewMode.compact:
+        return _buildCompactView();
+    }
+  }
+
+  Widget _buildListView() {
+    return ListView.builder(
+      padding: EdgeInsets.symmetric(horizontal: 20),
+      itemCount: filteredStudents.length,
+      itemBuilder: (context, index) {
+        final student = filteredStudents[index];
+        return _buildStudentCard(student, index + 1);
+      },
+    );
+  }
+
+  Widget _buildGridView() {
+    return GridView.builder(
+      padding: EdgeInsets.all(20),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 0.8,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+      ),
+      itemCount: filteredStudents.length,
+      itemBuilder: (context, index) {
+        final student = filteredStudents[index];
+        return _buildStudentGridCard(student, index + 1);
+      },
+    );
+  }
+
+  Widget _buildCompactView() {
+    return ListView.builder(
+      padding: EdgeInsets.symmetric(horizontal: 20),
+      itemCount: filteredStudents.length,
+      itemBuilder: (context, index) {
+        final student = filteredStudents[index];
+        return _buildStudentCompactCard(student, index + 1);
+      },
+    );
   }
 
   Widget _buildLoadingState() {
@@ -637,6 +740,275 @@ class _StudentPageState extends State<StudentPage> {
             child: Text(value),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStudentGridCard(Map<String, dynamic> student, int index) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                ),
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: Center(
+                child: Text(
+                  _getInitial(student['full_name']),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(height: 12),
+            Text(
+              student['full_name'] ?? 'Unknown Student',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Student #$index',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 12,
+              ),
+            ),
+            SizedBox(height: 12),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.school, size: 12, color: Colors.blue),
+                      SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          student['year_level'] ?? 'N/A',
+                          style: TextStyle(
+                            color: Colors.grey[700],
+                            fontSize: 10,
+                          ),
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.business, size: 12, color: Colors.green),
+                      SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          student['department'] ?? 'N/A',
+                          style: TextStyle(
+                            color: Colors.grey[700],
+                            fontSize: 10,
+                          ),
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: IconButton(
+                    onPressed: () => _showDeleteDialog(student),
+                    icon: Icon(Icons.delete_outline,
+                        color: Colors.red[600], size: 16),
+                    tooltip: 'Delete',
+                    padding: EdgeInsets.all(4),
+                    constraints: BoxConstraints(minWidth: 32, minHeight: 32),
+                  ),
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: IconButton(
+                    onPressed: () => _editStudent(student),
+                    icon: Icon(Icons.edit_outlined,
+                        color: Colors.blue[600], size: 16),
+                    tooltip: 'Edit',
+                    padding: EdgeInsets.all(4),
+                    constraints: BoxConstraints(minWidth: 32, minHeight: 32),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStudentCompactCard(Map<String, dynamic> student, int index) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.05),
+            spreadRadius: 1,
+            blurRadius: 5,
+            offset: Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Center(
+                child: Text(
+                  _getInitial(student['full_name']),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    student['full_name'] ?? 'Unknown Student',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[800],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Icon(Icons.school, size: 12, color: Colors.grey[600]),
+                      SizedBox(width: 4),
+                      Text(
+                        student['year_level'] ?? 'N/A',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 12,
+                        ),
+                      ),
+                      SizedBox(width: 16),
+                      Icon(Icons.business, size: 12, color: Colors.grey[600]),
+                      SizedBox(width: 4),
+                      Text(
+                        student['department'] ?? 'N/A',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Icon(Icons.group, size: 12, color: Colors.grey[600]),
+                      SizedBox(width: 4),
+                      Text(
+                        student['section'] ?? 'N/A',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Row(
+              children: [
+                IconButton(
+                  onPressed: () => _showDeleteDialog(student),
+                  icon: Icon(Icons.delete_outline,
+                      color: Colors.red[600], size: 18),
+                  tooltip: 'Delete',
+                  padding: EdgeInsets.all(4),
+                  constraints: BoxConstraints(minWidth: 32, minHeight: 32),
+                ),
+                IconButton(
+                  onPressed: () => _editStudent(student),
+                  icon: Icon(Icons.edit_outlined,
+                      color: Colors.blue[600], size: 18),
+                  tooltip: 'Edit',
+                  padding: EdgeInsets.all(4),
+                  constraints: BoxConstraints(minWidth: 32, minHeight: 32),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

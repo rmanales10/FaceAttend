@@ -2,6 +2,9 @@ import 'package:app_attend/src/admin/dashboard/screens/subjects/subject_controll
 import 'package:app_attend/src/widgets/snackbar_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+enum SubjectViewMode { list, grid, compact }
 
 class SubjectPage extends StatefulWidget {
   SubjectPage({super.key});
@@ -15,6 +18,7 @@ class _SubjectPageState extends State<SubjectPage> {
   final TextEditingController _searchController = TextEditingController();
   RxString searchQuery = ''.obs;
   RxList<Map<String, dynamic>> filteredSubjects = <Map<String, dynamic>>[].obs;
+  Rx<SubjectViewMode> currentViewMode = SubjectViewMode.list.obs;
 
   final selectedDepartment = 'BSIT'.obs;
   final List<String> department = [
@@ -29,6 +33,7 @@ class _SubjectPageState extends State<SubjectPage> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    _loadViewPreference();
 
     // Initialize filtered subjects when subjects change
     ever(_controller.subjects, (_) {
@@ -39,6 +44,17 @@ class _SubjectPageState extends State<SubjectPage> {
 
     // Fetch subjects after setting up the listener
     _controller.fetchSubject();
+  }
+
+  Future<void> _loadViewPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    final viewModeIndex = prefs.getInt('subject_view_mode') ?? 0;
+    currentViewMode.value = SubjectViewMode.values[viewModeIndex];
+  }
+
+  Future<void> _saveViewPreference(SubjectViewMode mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('subject_view_mode', mode.index);
   }
 
   void _onSearchChanged() {
@@ -151,6 +167,7 @@ class _SubjectPageState extends State<SubjectPage> {
                   ],
                 ),
               ),
+              _buildViewToggleButtons(),
             ],
           ),
           SizedBox(height: 20),
@@ -324,6 +341,48 @@ class _SubjectPageState extends State<SubjectPage> {
     );
   }
 
+  Widget _buildViewToggleButtons() {
+    return Obx(() => Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildViewButton(Icons.list, SubjectViewMode.list, 'List View'),
+              _buildViewButton(
+                  Icons.grid_view, SubjectViewMode.grid, 'Grid View'),
+              _buildViewButton(
+                  Icons.view_agenda, SubjectViewMode.compact, 'Compact View'),
+            ],
+          ),
+        ));
+  }
+
+  Widget _buildViewButton(IconData icon, SubjectViewMode mode, String tooltip) {
+    final isSelected = currentViewMode.value == mode;
+    return Container(
+      margin: EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: isSelected ? Colors.white : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: IconButton(
+        onPressed: () {
+          currentViewMode.value = mode;
+          _saveViewPreference(mode);
+        },
+        icon: Icon(
+          icon,
+          color: isSelected ? Color(0xFF667eea) : Colors.white,
+          size: 20,
+        ),
+        tooltip: tooltip,
+      ),
+    );
+  }
+
   Widget _buildSubjectsList() {
     return Obx(() {
       if (_controller.subjects.isEmpty) {
@@ -344,16 +403,59 @@ class _SubjectPageState extends State<SubjectPage> {
           await _controller.fetchSubject();
           _filterSubjects();
         },
-        child: ListView.builder(
-          padding: EdgeInsets.symmetric(horizontal: 20),
-          itemCount: filteredSubjects.length,
-          itemBuilder: (context, index) {
-            final subject = filteredSubjects[index];
-            return _buildSubjectCard(subject, index + 1);
-          },
-        ),
+        child: _buildSubjectsView(),
       );
     });
+  }
+
+  Widget _buildSubjectsView() {
+    switch (currentViewMode.value) {
+      case SubjectViewMode.list:
+        return _buildListView();
+      case SubjectViewMode.grid:
+        return _buildGridView();
+      case SubjectViewMode.compact:
+        return _buildCompactView();
+    }
+  }
+
+  Widget _buildListView() {
+    return ListView.builder(
+      padding: EdgeInsets.symmetric(horizontal: 20),
+      itemCount: filteredSubjects.length,
+      itemBuilder: (context, index) {
+        final subject = filteredSubjects[index];
+        return _buildSubjectCard(subject, index + 1);
+      },
+    );
+  }
+
+  Widget _buildGridView() {
+    return GridView.builder(
+      padding: EdgeInsets.all(20),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 0.8,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+      ),
+      itemCount: filteredSubjects.length,
+      itemBuilder: (context, index) {
+        final subject = filteredSubjects[index];
+        return _buildSubjectGridCard(subject, index + 1);
+      },
+    );
+  }
+
+  Widget _buildCompactView() {
+    return ListView.builder(
+      padding: EdgeInsets.symmetric(horizontal: 20),
+      itemCount: filteredSubjects.length,
+      itemBuilder: (context, index) {
+        final subject = filteredSubjects[index];
+        return _buildSubjectCompactCard(subject, index + 1);
+      },
+    );
   }
 
   Widget _buildLoadingState() {
@@ -679,6 +781,239 @@ class _SubjectPageState extends State<SubjectPage> {
             child: Text(value),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSubjectGridCard(Map<String, dynamic> subject, int index) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                ),
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: Center(
+                child: Text(
+                  _getInitial(subject['subject_name']),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(height: 12),
+            Text(
+              subject['subject_name'] ?? 'Unknown Subject',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            SizedBox(height: 8),
+            Text(
+              subject['course_code'] ?? 'N/A',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 12),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.school, size: 12, color: Colors.blue),
+                  SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      subject['department'] ?? 'N/A',
+                      style: TextStyle(
+                        color: Colors.grey[700],
+                        fontSize: 10,
+                      ),
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: IconButton(
+                    onPressed: () => _showDeleteDialog(subject),
+                    icon: Icon(Icons.delete_outline,
+                        color: Colors.red[600], size: 16),
+                    tooltip: 'Delete',
+                    padding: EdgeInsets.all(4),
+                    constraints: BoxConstraints(minWidth: 32, minHeight: 32),
+                  ),
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: IconButton(
+                    onPressed: () => _showSubjectDetails(subject),
+                    icon: Icon(Icons.visibility_outlined,
+                        color: Colors.blue[600], size: 16),
+                    tooltip: 'View Details',
+                    padding: EdgeInsets.all(4),
+                    constraints: BoxConstraints(minWidth: 32, minHeight: 32),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubjectCompactCard(Map<String, dynamic> subject, int index) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.05),
+            spreadRadius: 1,
+            blurRadius: 5,
+            offset: Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Center(
+                child: Text(
+                  _getInitial(subject['subject_name']),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    subject['subject_name'] ?? 'Unknown Subject',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[800],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Icon(Icons.code, size: 12, color: Colors.grey[600]),
+                      SizedBox(width: 4),
+                      Text(
+                        subject['course_code'] ?? 'N/A',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 12,
+                        ),
+                      ),
+                      SizedBox(width: 16),
+                      Icon(Icons.school, size: 12, color: Colors.grey[600]),
+                      SizedBox(width: 4),
+                      Text(
+                        subject['department'] ?? 'N/A',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Row(
+              children: [
+                IconButton(
+                  onPressed: () => _showDeleteDialog(subject),
+                  icon: Icon(Icons.delete_outline,
+                      color: Colors.red[600], size: 18),
+                  tooltip: 'Delete',
+                  padding: EdgeInsets.all(4),
+                  constraints: BoxConstraints(minWidth: 32, minHeight: 32),
+                ),
+                IconButton(
+                  onPressed: () => _showSubjectDetails(subject),
+                  icon: Icon(Icons.visibility_outlined,
+                      color: Colors.blue[600], size: 18),
+                  tooltip: 'View Details',
+                  padding: EdgeInsets.all(4),
+                  constraints: BoxConstraints(minWidth: 32, minHeight: 32),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

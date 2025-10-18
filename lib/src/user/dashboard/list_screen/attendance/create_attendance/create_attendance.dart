@@ -13,27 +13,31 @@ class CreateAttendance extends StatefulWidget {
 }
 
 class _CreateAttendanceState extends State<CreateAttendance> {
-  final TextEditingController _timeController = TextEditingController();
-  final DateFormat _timeFormat = DateFormat("hh:mm a");
-  final DateFormat dateFormat = DateFormat('MM/dd/yyyy');
-  final selectedTime = RxString('');
-  final selectedDate = Rxn<DateTime>();
   final _controller = Get.put(CreateController());
 
   // Dropdown reactive variables
-  final selectedDepartment = RxnString();
-  final List<String> department = [
-    'BSIT',
-    'BFPT',
-    'BTLED - HE',
-    'BTLED - ICT',
-    'BTLED - IA',
-  ];
-  final selectedSection = RxnString();
-  final sections = RxList<String>();
-  final selectedSubject = RxnString();
-  final subjects = RxList<String>();
+  final selectedClassSchedule = Rxn<Map<String, dynamic>>();
+  final classSchedules = RxList<Map<String, dynamic>>();
   final isLoading = RxBool(false);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadClassSchedules();
+  }
+
+  Future<void> _loadClassSchedules() async {
+    try {
+      isLoading.value = true;
+      await _controller.fetchAllClassSchedules();
+      classSchedules.value = _controller.classSchedules;
+    } catch (e) {
+      _showErrorSnackbar('Failed to load class schedules');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -56,17 +60,11 @@ class _CreateAttendanceState extends State<CreateAttendance> {
           children: [
             _buildHeader(),
             const SizedBox(height: 32),
-            _buildDepartmentDropdown(),
+            _buildClassScheduleDropdown(),
             const SizedBox(height: 24),
-            if (selectedDepartment.value != null) _buildSubjectDropdown(),
-            const SizedBox(height: 24),
-            if (selectedSubject.value != null) _buildSectionDropdown(),
-            const SizedBox(height: 24),
-            if (selectedSection.value != null) _buildTimeSelector(),
-            const SizedBox(height: 24),
-            if (selectedSection.value != null) _buildDateSelector(context),
+            if (selectedClassSchedule.value != null) _buildScheduleDetails(),
             const SizedBox(height: 40),
-            if (selectedSection.value != null)
+            if (selectedClassSchedule.value != null)
               Center(child: _buildAddAttendanceButton(size)),
           ],
         ),
@@ -104,97 +102,52 @@ class _CreateAttendanceState extends State<CreateAttendance> {
             color: Colors.grey[600],
           ),
         ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: widget.isAsynchronous ? Colors.blue[100] : Colors.green[100],
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: widget.isAsynchronous
+                  ? Colors.blue[300]!
+                  : Colors.green[300]!,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                widget.isAsynchronous ? Icons.access_time : Icons.person,
+                size: 16,
+                color: widget.isAsynchronous
+                    ? Colors.blue[700]
+                    : Colors.green[700],
+              ),
+              const SizedBox(width: 6),
+              Text(
+                widget.isAsynchronous ? 'Asynchronous' : 'Face to Face',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: widget.isAsynchronous
+                      ? Colors.blue[700]
+                      : Colors.green[700],
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildDepartmentDropdown() {
-    return _buildDropdownSection(
-      label: 'Select Department:',
-      selectedValue: selectedDepartment,
-      options: department,
-      onChanged: (newValue) async {
-        try {
-          isLoading.value = true;
-          selectedDepartment.value = newValue!;
-          subjects.clear();
-          selectedSubject.value = null;
-          selectedSection.value = null;
-
-          await _controller.fetchSubject(department: selectedDepartment.value!);
-
-          for (var s in _controller.subjects) {
-            final courseSubject = '${s['course_code']} ${s['subject_name']}';
-            if (!subjects.contains(courseSubject)) {
-              subjects.add(courseSubject);
-            }
-          }
-
-          if (subjects.isNotEmpty) {
-            selectedSubject.value = subjects.first;
-          }
-        } catch (e) {
-          _showErrorSnackbar('Failed to fetch subjects');
-        } finally {
-          isLoading.value = false;
-        }
-      },
-    );
-  }
-
-  Widget _buildSubjectDropdown() {
-    return _buildDropdownSection(
-      label: 'Select Subject:',
-      selectedValue: selectedSubject,
-      options: subjects,
-      onChanged: (newValue) async {
-        try {
-          isLoading.value = true;
-          selectedSubject.value = newValue!;
-          sections.clear();
-          selectedSection.value = null;
-
-          await _controller.fetchSection(subject: selectedSubject.value!);
-
-          for (var s in _controller.sections) {
-            final sectionBlock = s['section_year_block'];
-            if (!sections.contains(sectionBlock)) {
-              sections.add(sectionBlock);
-            }
-          }
-
-          if (sections.isNotEmpty) {
-            selectedSection.value = sections.first;
-          }
-        } catch (e) {
-          _showErrorSnackbar('Failed to fetch sections');
-        } finally {
-          isLoading.value = false;
-        }
-      },
-    );
-  }
-
-  Widget _buildSectionDropdown() {
-    return _buildDropdownSection(
-      label: 'Select Section:',
-      selectedValue: selectedSection,
-      options: sections,
-      onChanged: (newValue) => selectedSection.value = newValue!,
-    );
-  }
-
-  Widget _buildDropdownSection({
-    required String label,
-    required RxnString selectedValue,
-    required List<String> options,
-    required ValueChanged<String?> onChanged,
-  }) {
+  Widget _buildClassScheduleDropdown() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          label,
+          'Select Class Schedule:',
           style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -209,20 +162,28 @@ class _CreateAttendanceState extends State<CreateAttendance> {
             color: Colors.blue[50],
           ),
           child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: selectedValue.value,
+            child: DropdownButton<Map<String, dynamic>>(
+              value: selectedClassSchedule.value,
               isExpanded: true,
-              hint: Text('Select an option',
+              hint: Text('Select a class schedule',
                   style: TextStyle(color: Colors.grey[600])),
               icon: Icon(Icons.arrow_drop_down, color: Colors.blue[700]),
               style: TextStyle(fontSize: 16, color: Colors.blue[800]),
-              items: options.map((String value) {
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
+              items: classSchedules.map((Map<String, dynamic> schedule) {
+                return DropdownMenuItem<Map<String, dynamic>>(
+                  value: schedule,
+                  child: Text(
+                    '${schedule['course_code']} - ${schedule['subject_name']}',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 );
               }).toList(),
-              onChanged: options.isEmpty ? null : onChanged,
+              onChanged: classSchedules.isEmpty
+                  ? null
+                  : (Map<String, dynamic>? newValue) {
+                      selectedClassSchedule.value = newValue;
+                    },
             ),
           ),
         ),
@@ -230,129 +191,84 @@ class _CreateAttendanceState extends State<CreateAttendance> {
     );
   }
 
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: selectedDate.value ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) {
-      selectedDate.value = picked;
-      // Force UI update
-      setState(() {});
-    }
-  }
+  Widget _buildScheduleDetails() {
+    return Obx(() {
+      if (selectedClassSchedule.value == null) return const SizedBox.shrink();
 
-  Widget _buildDateSelector(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Select Date:',
-          style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.blue[700]),
+      final schedule = selectedClassSchedule.value!;
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.blue[50],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.blue[200]!),
         ),
-        const SizedBox(height: 8),
-        GestureDetector(
-          onTap: () => _selectDate(context),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.blue[200]!),
-              borderRadius: BorderRadius.circular(12),
-              color: Colors.blue[50],
-            ),
-            child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Obx(() => Text(
-                      selectedDate.value != null
-                          ? dateFormat.format(selectedDate.value!)
-                          : 'MM/DD/YYYY',
-                      style: TextStyle(fontSize: 16, color: Colors.blue[800]),
-                    )),
-                const Spacer(),
-                Icon(Icons.calendar_today, size: 20, color: Colors.blue[700]),
+                Icon(Icons.schedule, color: Colors.blue[700], size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'Schedule Details',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.blue[700],
+                  ),
+                ),
               ],
             ),
-          ),
+            const SizedBox(height: 12),
+            _buildDetailRow('Subject',
+                '${schedule['course_code']} - ${schedule['subject_name']}'),
+            _buildDetailRow('Course Year', schedule['course_year']),
+            _buildDetailRow('Year Level', schedule['year_level']),
+            _buildDetailRow('Schedule', schedule['schedule']),
+            _buildDetailRow('Teacher', schedule['teacher_name']),
+            _buildDetailRow('Room', schedule['building_room']),
+            _buildDetailRow('Department', schedule['department']),
+          ],
         ),
-      ],
-    );
+      );
+    });
   }
 
-  Future<void> _selectTime() async {
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.now(),
-    );
-    if (picked != null) {
-      final now = DateTime.now();
-      final selectedDateTime =
-          DateTime(now.year, now.month, now.day, picked.hour, picked.minute);
-      _timeController.text = _timeFormat.format(selectedDateTime);
-      selectedTime.value = _timeController.text;
-    }
-  }
-
-  Widget _buildTimeSelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Select Time:',
-          style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.blue[700]),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _timeController,
-          readOnly: true,
-          decoration: InputDecoration(
-            hintText: 'Select time',
-            hintStyle: TextStyle(color: Colors.grey[600]),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.blue[200]!),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.blue[200]!),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.blue[400]!),
-            ),
-            filled: true,
-            fillColor: Colors.blue[50],
-            suffixIcon: IconButton(
-              icon: Icon(Icons.access_time, color: Colors.blue[700]),
-              onPressed: _selectTime,
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              '$label:',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey[700],
+              ),
             ),
           ),
-          style: TextStyle(fontSize: 16, color: Colors.blue[800]),
-          onTap: () {
-            if (_timeController.text.isEmpty) {
-              final now = DateTime.now();
-              _timeController.text = _timeFormat.format(now);
-            }
-          },
-        ),
-      ],
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.blue[800],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildAddAttendanceButton(Size size) {
     return Obx(() {
-      final canCreateAttendance = selectedDepartment.value != null &&
-          selectedSubject.value != null &&
-          selectedSection.value != null &&
-          selectedDate.value != null &&
-          _timeController.text.isNotEmpty;
+      final canCreateAttendance = selectedClassSchedule.value != null;
 
       return SizedBox(
         width: size.width * 0.7,
@@ -375,23 +291,22 @@ class _CreateAttendanceState extends State<CreateAttendance> {
   }
 
   Future<void> _createAttendance() async {
-    if (selectedDepartment.value == null ||
-        selectedSubject.value == null ||
-        selectedSection.value == null ||
-        selectedDate.value == null ||
-        _timeController.text.isEmpty) {
-      _showErrorSnackbar('Please fill in all required fields');
+    if (selectedClassSchedule.value == null) {
+      _showErrorSnackbar('Please select a class schedule');
       return;
     }
 
     try {
       isLoading.value = true;
+      final schedule = selectedClassSchedule.value!;
+      final now = DateTime.now();
       await _controller.createAttendance(
-        subject: selectedSubject.value!,
-        section: selectedSection.value!,
-        date: selectedDate.value!,
-        time: _timeController.text,
+        subject: '${schedule['course_code']} ${schedule['subject_name']}',
+        section: schedule['course_year'],
+        date: now,
+        time: DateFormat("hh:mm a").format(now),
         isAsynchronous: widget.isAsynchronous,
+        classSchedule: selectedClassSchedule.value!,
       );
 
       Get.back();
