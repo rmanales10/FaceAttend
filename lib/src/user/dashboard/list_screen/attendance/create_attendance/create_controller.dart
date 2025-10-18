@@ -25,19 +25,18 @@ class CreateController extends GetxController {
       required Map<String, dynamic> classSchedule}) async {
     String autoId = generateUniqueId();
     try {
-      await _firestore
-          .collection('users')
-          .doc(currentUser!.uid)
-          .collection('attendance')
-          .doc(autoId)
-          .set({
+      await _firestore.collection('classAttendance').doc(autoId).set({
         'id': autoId,
+        'created_by': currentUser!.uid,
+        'created_at': FieldValue.serverTimestamp(),
+        'updated_at': FieldValue.serverTimestamp(),
         'section': section,
         'date': date,
         'time': time,
         'subject': subject,
         'is_submitted': false,
         'is_asynchronous': isAsynchronous,
+        'status': 'pending', // pending, active, completed
         'class_schedule_id': classSchedule['id'],
         'class_schedule': {
           'subject_id': classSchedule['subject_id'],
@@ -51,6 +50,10 @@ class CreateController extends GetxController {
           'teacher_name': classSchedule['teacher_name'],
           'department': classSchedule['department'],
         },
+        'attendance_records': [], // Array to store student attendance records
+        'total_students': 0,
+        'present_count': 0,
+        'absent_count': 0,
       }, SetOptions(merge: true));
     } catch (e) {
       log('error $e');

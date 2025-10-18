@@ -13,9 +13,9 @@ class AttendanceController extends GetxController {
   Future<void> getAllAttendance() async {
     try {
       QuerySnapshot querySnapshot = await _firestore
-          .collection('users')
-          .doc(currentUser!.uid)
-          .collection('attendance')
+          .collection('classAttendance')
+          .where('created_by', isEqualTo: currentUser!.uid)
+          .orderBy('created_at', descending: true)
           .get();
       allAttendance.value = querySnapshot.docs
           .map((doc) => {
@@ -26,28 +26,40 @@ class AttendanceController extends GetxController {
                 'time': doc['time'],
                 'is_submitted': doc['is_submitted'],
                 'is_asynchronous': doc['is_asynchronous'],
+                'status': doc['status'],
+                'created_at': doc['created_at'],
+                'class_schedule': doc['class_schedule'],
+                'total_students': doc['total_students'],
+                'present_count': doc['present_count'],
+                'absent_count': doc['absent_count'],
               })
           .toList();
-      // log('success : $allAttendance');
+      log('Fetched ${allAttendance.length} attendance records from classAttendance');
     } catch (e) {
-      log('Error $e');
+      log('Error fetching attendance records: $e');
     }
   }
 
   Future<void> deleteAttendanceRecord(var attendanceId, var isSubmitted) async {
-    !isSubmitted
-        ? await _firestore
-            .collection('users')
-            .doc(currentUser!.uid)
-            .collection('attendance')
+    try {
+      if (!isSubmitted) {
+        // Delete from classAttendance collection
+        await _firestore
+            .collection('classAttendance')
             .doc(attendanceId)
-            .delete()
-        : await _firestore.collection('record').doc(attendanceId).delete();
-    await _firestore
-        .collection('users')
-        .doc(currentUser!.uid)
-        .collection('attendance')
-        .doc(attendanceId)
-        .delete();
+            .delete();
+        log('Deleted attendance record: $attendanceId');
+      } else {
+        // If submitted, also delete from record collection
+        await _firestore.collection('record').doc(attendanceId).delete();
+        await _firestore
+            .collection('classAttendance')
+            .doc(attendanceId)
+            .delete();
+        log('Deleted submitted attendance record: $attendanceId');
+      }
+    } catch (e) {
+      log('Error deleting attendance record: $e');
+    }
   }
 }

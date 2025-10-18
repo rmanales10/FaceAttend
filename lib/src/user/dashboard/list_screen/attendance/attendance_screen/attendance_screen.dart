@@ -215,12 +215,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         final timestamp = record['date'] as Timestamp;
         final dateTime = timestamp.toDate();
         final formattedDate = DateFormat('MMMM d, y').format(dateTime);
-
-        final label =
-            'Subject: ${record['subject']}\nSection: ${record['section']}\nDate: $formattedDate';
+        final formattedTime = record['time'] ?? '';
 
         return _buildAttendanceCard(
-          label: label,
+          record: record,
+          formattedDate: formattedDate,
+          formattedTime: formattedTime,
           onTap: () => Get.to(() => ListOfStudents(
                 subject: record['subject'],
                 section: record['section'],
@@ -230,20 +230,26 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 isAsynchronous: record['is_asynchronous'] ?? false,
               )),
           onDelete: () => _confirmDelete(record['id'], record['is_submitted']),
-          isSubmitted: record['is_submitted'],
-          isAsynchronous: record['is_asynchronous'] ?? false, // Add this line
         );
       },
     );
   }
 
   Widget _buildAttendanceCard({
-    required String label,
+    required Map<String, dynamic> record,
+    required String formattedDate,
+    required String formattedTime,
     required VoidCallback onTap,
     required VoidCallback onDelete,
-    required bool isSubmitted,
-    required bool isAsynchronous,
   }) {
+    final isSubmitted = record['is_submitted'] ?? false;
+    final isAsynchronous = record['is_asynchronous'] ?? false;
+    final status = record['status'] ?? 'pending';
+    final classSchedule = record['class_schedule'] ?? {};
+    final totalStudents = record['total_students'] ?? 0;
+    final presentCount = record['present_count'] ?? 0;
+    final absentCount = record['absent_count'] ?? 0;
+
     return Card(
       elevation: 3,
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -256,37 +262,107 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Header with subject and type
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(
-                    child: Text(
-                      label,
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.bold),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          record['subject'] ?? 'Unknown Subject',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Section: ${record['section'] ?? 'Unknown'}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   _buildAttendanceTypeChip(isAsynchronous),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
+
+              // Date and time info
+              Row(
+                children: [
+                  Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
+                  const SizedBox(width: 8),
+                  Text(
+                    formattedDate,
+                    style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                  ),
+                  const SizedBox(width: 16),
+                  Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
+                  const SizedBox(width: 8),
+                  Text(
+                    formattedTime,
+                    style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                  ),
+                ],
+              ),
+
+              // Class schedule details if available
+              if (classSchedule.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.person, size: 16, color: Colors.grey[600]),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Teacher: ${classSchedule['teacher_name'] ?? 'Unknown'}',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Room: ${classSchedule['building_room'] ?? 'Unknown'}',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+
+              // Attendance statistics
+              if (totalStudents > 0) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _buildStatChip('Total: $totalStudents', Colors.blue),
+                    const SizedBox(width: 8),
+                    _buildStatChip('Present: $presentCount', Colors.green),
+                    const SizedBox(width: 8),
+                    _buildStatChip('Absent: $absentCount', Colors.red),
+                  ],
+                ),
+              ],
+
+              const SizedBox(height: 12),
+
+              // Status and actions
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  if (isSubmitted)
-                    Chip(
-                      label: const Text('Submitted'),
-                      avatar: const Icon(Icons.check_circle,
-                          color: Colors.green, size: 18),
-                      backgroundColor: Colors.green.withOpacity(0.1),
-                    )
-                  else
-                    Chip(
-                      label: const Text('Pending'),
-                      avatar: const Icon(Icons.pending,
-                          color: Colors.orange, size: 18),
-                      backgroundColor: Colors.orange.withOpacity(0.1),
-                    ),
+                  _buildStatusChip(status, isSubmitted),
                   IconButton(
                     icon: const Icon(Icons.delete, color: Colors.red),
                     onPressed: onDelete,
@@ -298,6 +374,52 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildStatChip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          color: color,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusChip(String status, bool isSubmitted) {
+    Color color;
+    String label;
+    IconData icon;
+
+    if (isSubmitted) {
+      color = Colors.green;
+      label = 'Submitted';
+      icon = Icons.check_circle;
+    } else if (status == 'active') {
+      color = Colors.blue;
+      label = 'Active';
+      icon = Icons.play_circle;
+    } else {
+      color = Colors.orange;
+      label = 'Pending';
+      icon = Icons.pending;
+    }
+
+    return Chip(
+      label: Text(label),
+      avatar: Icon(icon, color: color, size: 18),
+      backgroundColor: color.withOpacity(0.1),
+      labelStyle: TextStyle(color: color, fontWeight: FontWeight.w500),
     );
   }
 
