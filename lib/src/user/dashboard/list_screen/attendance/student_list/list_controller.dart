@@ -93,6 +93,29 @@ class ListController extends GetxController {
     required var section,
   }) async {
     try {
+      // Calculate attendance statistics
+      int totalStudents = studentRecord.length;
+      int presentCount =
+          studentRecord.where((record) => record['present'] == '✓').length;
+      int absentCount = totalStudents - presentCount;
+
+      log('Attendance Summary:');
+      log('Total Students: $totalStudents');
+      log('Present: $presentCount');
+      log('Absent: $absentCount');
+
+      // Update the classAttendance document with student records and statistics
+      await _firestore.collection('classAttendance').doc(attendanceId).update({
+        'attendance_records': studentRecord,
+        'total_students': totalStudents,
+        'present_count': presentCount,
+        'absent_count': absentCount,
+        'is_submitted': true,
+        'status': 'completed',
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+
+      // Also save to record collection for backward compatibility
       await _firestore.collection('record').doc(attendanceId).set({
         'attendance_id': attendanceId,
         'code': code,
@@ -104,8 +127,10 @@ class ListController extends GetxController {
         'teacher': teacher,
         'user_id': currentUser!.uid,
         'section': section,
-        'is_submitted': false,
+        'is_submitted': true,
       }, SetOptions(merge: true));
+
+      log('Attendance records saved successfully!');
     } catch (e) {
       log('Error adding attendance record: $e');
     }

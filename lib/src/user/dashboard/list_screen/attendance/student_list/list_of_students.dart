@@ -1,6 +1,4 @@
 import 'dart:developer';
-import 'package:app_attend/src/user/api_services/document_service.dart';
-import 'package:app_attend/src/user/dashboard/list_screen/attendance/student_list/docx_template.dart';
 import 'package:app_attend/src/user/dashboard/list_screen/attendance/student_list/list_controller.dart';
 import 'package:app_attend/src/user/dashboard/list_screen/profile/profile_controller.dart';
 import 'package:app_attend/src/user/dashboard/list_screen/attendance/face_recognition/face_recognition.dart';
@@ -36,7 +34,6 @@ class ListOfStudents extends StatefulWidget {
 class _ListOfStudentsState extends State<ListOfStudents> {
   final _controller = Get.put(ListController());
   final _profileController = Get.put(ProfileController());
-  final documentService = Get.put(DocumentService());
 
   final RxList<Map<String, dynamic>> studentRecord =
       <Map<String, dynamic>>[].obs;
@@ -153,7 +150,8 @@ class _ListOfStudentsState extends State<ListOfStudents> {
                   child: Obx(() {
                     final studentList = _controller.studentList;
 
-                    if (isPresent.isEmpty) {
+                    // Ensure isPresent list is synchronized with student list
+                    if (isPresent.length != studentList.length) {
                       isPresent.value =
                           List.generate(studentList.length, (_) => false);
                     }
@@ -267,14 +265,15 @@ class _ListOfStudentsState extends State<ListOfStudents> {
                               teacher: _profileController.userInfo['fullname'],
                               section: widget.section,
                             );
-                            await _controller.isSubmitted(
-                                attendanceId: widget.attendanceId);
-                            populateWordTemplate();
                             Get.back();
+                            showSuccess(
+                                message: 'Attendance submitted successfully!');
                           }
                         : () async {
-                            _onReportSelected(
-                                attendanceId: widget.attendanceId);
+                            // Report generation removed
+                            Get.back();
+                            showSuccess(
+                                message: 'Attendance already submitted!');
                           },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: blue,
@@ -324,7 +323,10 @@ class _ListOfStudentsState extends State<ListOfStudents> {
                 studentRecord.add({
                   'id': student['id'],
                   'name': student['full_name'] ?? student['name'],
-                  'present': isPresent[index] == false ? 'X' : '✓',
+                  'present':
+                      (index < isPresent.length && isPresent[index] == false)
+                          ? 'X'
+                          : '✓',
                 });
               }
 
@@ -341,14 +343,23 @@ class _ListOfStudentsState extends State<ListOfStudents> {
                                 : Colors.red),
                       )
                     : Checkbox(
-                        value: isPresent[index],
+                        value:
+                            index < isPresent.length ? isPresent[index] : false,
                         onChanged: (value) {
                           setState(() {
-                            isPresent[index] = value ?? false;
+                            if (index < isPresent.length) {
+                              isPresent[index] = value ?? false;
+                            }
                           });
 
-                          studentRecord[index]['present'] =
-                              isPresent[index] == false ? 'X' : '✓';
+                          // Update student record with bounds checking
+                          if (index < studentRecord.length) {
+                            studentRecord[index]['present'] =
+                                (index < isPresent.length &&
+                                        isPresent[index] == false)
+                                    ? 'X'
+                                    : '✓';
+                          }
                         },
                       )),
               ]);
@@ -398,51 +409,5 @@ class _ListOfStudentsState extends State<ListOfStudents> {
         ],
       ),
     );
-  }
-
-  void _onReportSelected({required attendanceId}) async {
-    _controller.printAttendanceStudentRecord(attendanceId: attendanceId);
-    final generate = _controller.attendaceStudentRecord;
-    final record = _controller.studentPrintList;
-    final List recorded = [];
-    int index = 1;
-    for (var records in record) {
-      var data = {
-        "index": '${index++}',
-        "name": records['name'],
-        "section": generate['section'],
-        "present": '${records['present']}',
-      };
-      recorded.add(data);
-    }
-    log('$recorded');
-    log('Exporting to PDF...');
-
-    try {
-      await _profileController.fetchUserInfo();
-      final response = await documentService.generateDocument(
-        record: recorded,
-        subject: generate['subject'],
-        datenow: generate['datenow'],
-        code: widget.subject.split(' ')[0],
-        teacher: _profileController.userInfo['fullname'],
-      );
-
-      if (response.statusCode == 200) {
-        final String downloadLink = response.body['data'];
-        await _controller.storedUrl(
-          attendanceId: attendanceId,
-          subject: generate['subject'],
-          section: generate['section'],
-          date: generate['datenow'],
-          type: 'Docx',
-          url: downloadLink,
-        );
-        Get.back();
-        showSuccess(message: 'Report generated successfully!');
-      }
-    } catch (e) {
-      log('Error $e');
-    }
   }
 }

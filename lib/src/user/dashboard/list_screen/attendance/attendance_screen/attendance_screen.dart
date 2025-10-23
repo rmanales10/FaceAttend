@@ -238,7 +238,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 isSubmitted: record['is_submitted'],
                 isAsynchronous: record['is_asynchronous'] ?? false,
                 subjectId: record['class_schedule']?['subject_id'] ?? '',
-              )),
+              ))?.then((_) {
+            // Refresh attendance list when returning from ListOfStudents
+            _controller.refreshAttendance();
+          }),
           onDelete: () => _confirmDelete(record['id'], record['is_submitted']),
         );
       },
