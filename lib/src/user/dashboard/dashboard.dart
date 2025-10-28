@@ -35,30 +35,12 @@ class _DashboardState extends State<Dashboard> {
     return Scaffold(
       resizeToAvoidBottomInset: false,
       body: Center(child: body[_currentIndex]),
-      floatingActionButton: SizedBox(
-        width: 70,
-        height: 70,
-        child: FloatingActionButton(
-          onPressed: () {
-            setState(() {
-              _currentIndex = body.length - 1;
-            });
-          },
-          backgroundColor: blue,
-          shape: CircleBorder(),
-          child: Icon(Icons.note_add, color: Colors.white),
-        ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: BottomAppBar(
-        shape: CircularNotchedRectangle(),
-        notchMargin: 10,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _buildNavItem(0, Icons.home_filled),
             _buildNavItem(1, Icons.people),
-            SizedBox(width: 48), // Space for FAB
             _buildNavItem(2, Icons.report),
             _buildNavItem(3, Icons.person_2),
           ],
