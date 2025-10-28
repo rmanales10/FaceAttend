@@ -17,26 +17,31 @@ class AttendanceController extends GetxController {
           .where('created_by', isEqualTo: currentUser!.uid)
           .orderBy('created_at', descending: true)
           .get();
-      allAttendance.value = querySnapshot.docs
-          .map((doc) => {
-                'id': doc['id'],
-                'date': doc['date'],
-                'subject': doc['subject'],
-                'section': doc['section'],
-                'time': doc['time'],
-                'is_submitted': doc['is_submitted'],
-                'is_asynchronous': doc['is_asynchronous'],
-                'status': doc['status'],
-                'created_at': doc['created_at'],
-                'class_schedule': doc['class_schedule'],
-                'total_students': doc['total_students'],
-                'present_count': doc['present_count'],
-                'absent_count': doc['absent_count'],
-              })
-          .toList();
+
+      allAttendance.value = querySnapshot.docs.map((doc) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        return {
+          'id': data['id'] ?? doc.id,
+          'date': data['date'],
+          'subject': data['subject'],
+          'section': data['section'],
+          'time': data['time'],
+          'is_submitted': data['is_submitted'] ?? false,
+          'is_asynchronous': data['is_asynchronous'] ?? false,
+          'status': data['status'] ?? 'pending',
+          'created_at': data['created_at'],
+          'class_schedule': data['class_schedule'],
+          'total_students': data['total_students'] ?? 0,
+          'present_count': data['present_count'] ?? 0,
+          'absent_count': data['absent_count'] ?? 0,
+          'schedule_id': data['class_schedule_id'] ?? '',
+        };
+      }).toList();
+
       log('Fetched ${allAttendance.length} attendance records from classAttendance');
     } catch (e) {
       log('Error fetching attendance records: $e');
+      allAttendance.clear();
     }
   }
 

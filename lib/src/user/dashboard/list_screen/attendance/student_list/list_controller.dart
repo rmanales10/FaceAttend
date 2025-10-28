@@ -49,13 +49,11 @@ class ListController extends GetxController {
         }
       }
 
-      // For now, use all students with the subject since section field doesn't exist
-      // TODO: Add section field to student documents or use a different approach
-      QuerySnapshot querySnapshot = allStudentsSnapshot;
+      // Filter students by section using section_year_block field
+      // The section parameter should match the student's section_year_block
+      log('Filtering students by section: $section');
 
-      log('Using all students with subject (section filtering not available)');
-
-      studentList.value = querySnapshot.docs.map((doc) {
+      studentList.value = allStudentsSnapshot.docs.map((doc) {
         var data = doc.data() as Map<String, dynamic>;
         return {
           'id': doc.id,
@@ -69,6 +67,35 @@ class ListController extends GetxController {
           'created_at': data['created_at'],
           'updated_at': data['updated_at'],
         };
+      }).where((student) {
+        // Filter by matching section_year_block to the provided section
+        String studentSection = (student['section_year_block'] ?? '')
+            .toString()
+            .trim()
+            .toUpperCase();
+        String targetSection = section.toString().trim().toUpperCase();
+
+        // Generate fallback section if section_year_block is missing
+        if (studentSection.isEmpty || studentSection == 'UNKNOWN') {
+          String department = (student['department'] ?? '').toString();
+          String departmentCode = department.split(' - ').isNotEmpty
+              ? department.split(' - ')[0].trim()
+              : '';
+          String yearLevel = (student['year_level'] ?? '').toString();
+          String yearNumber = yearLevel.contains('1st')
+              ? '1'
+              : yearLevel.contains('2nd')
+                  ? '2'
+                  : yearLevel.contains('3rd')
+                      ? '3'
+                      : '4';
+          String block = (student['block'] ?? '').toString();
+          studentSection =
+              '$departmentCode $yearNumber$block'.trim().toUpperCase();
+        }
+
+        log('Comparing student section "$studentSection" with target "$targetSection"');
+        return studentSection == targetSection;
       }).toList();
 
       log('Final student list: ${studentList.length} students');
@@ -139,6 +166,41 @@ class ListController extends GetxController {
   // Observable for attendance record
   RxMap<String, dynamic> attendaceStudentRecord = <String, dynamic>{}.obs;
   RxList<Map<String, dynamic>> studentPrintList = <Map<String, dynamic>>[].obs;
+
+  // Get existing attendance records for a specific attendance ID
+  Future<List<Map<String, dynamic>>> getExistingAttendanceRecords({
+    required String attendanceId,
+  }) async {
+    try {
+      log('Fetching existing attendance records for ID: $attendanceId');
+
+      DocumentSnapshot documentSnapshot = await _firestore
+          .collection('classAttendance')
+          .doc(attendanceId)
+          .get();
+
+      if (documentSnapshot.exists) {
+        var data = documentSnapshot.data() as Map<String, dynamic>;
+
+        // Check if attendance_records field exists
+        if (data['attendance_records'] != null) {
+          final List<dynamic> rawRecords = data['attendance_records'];
+          var records = rawRecords
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+
+          log('Found ${records.length} existing attendance records');
+          return records;
+        }
+      }
+
+      log('No existing attendance records found');
+      return [];
+    } catch (e) {
+      log('Error fetching existing attendance records: $e');
+      return [];
+    }
+  }
 
   // Get and print attendance student record
   Future<void> printAttendanceStudentRecord({

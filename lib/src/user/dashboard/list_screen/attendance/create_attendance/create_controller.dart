@@ -31,7 +31,7 @@ class CreateController extends GetxController {
         'created_at': FieldValue.serverTimestamp(),
         'updated_at': FieldValue.serverTimestamp(),
         'section': section,
-        'date': date,
+        'date': Timestamp.fromDate(date), // Convert DateTime to Timestamp
         'time': time,
         'subject': subject,
         'is_submitted': false,

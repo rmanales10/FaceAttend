@@ -310,12 +310,19 @@ class _CreateAttendanceState extends State<CreateAttendance> {
         classSchedule: selectedClassSchedule.value!,
       );
 
+      // Refresh attendance list BEFORE going back
+      try {
+        if (Get.isRegistered<AttendanceController>()) {
+          await Get.find<AttendanceController>().refreshAttendance();
+        }
+      } catch (e) {
+        print('Error refreshing attendance: $e');
+      }
+
       Get.back();
       showSuccess(
         message: 'Attendance created successfully!',
       );
-      // Refresh attendance list
-      Get.find<AttendanceController>().refreshAttendance();
     } catch (e) {
       _showErrorSnackbar('Failed to create attendance: ${e.toString()}');
     } finally {

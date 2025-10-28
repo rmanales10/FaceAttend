@@ -1,7 +1,6 @@
 import 'dart:developer';
 import 'package:app_attend/src/user/dashboard/list_screen/attendance/student_list/list_controller.dart';
 import 'package:app_attend/src/user/dashboard/list_screen/profile/profile_controller.dart';
-import 'package:app_attend/src/user/dashboard/list_screen/attendance/face_recognition/face_recognition.dart';
 import 'package:app_attend/src/widgets/color_constant.dart';
 import 'package:app_attend/src/widgets/snackbar_utils.dart';
 import 'package:flutter/material.dart';
@@ -51,6 +50,7 @@ class _ListOfStudentsState extends State<ListOfStudents> {
     log('Subject ID: ${widget.subjectId}');
     log('Section: ${widget.section}');
     log('Subject: ${widget.subject}');
+    log('Attendance ID: ${widget.attendanceId}');
 
     if (widget.subjectId.isNotEmpty) {
       await _controller.getStudentsList(
@@ -61,20 +61,69 @@ class _ListOfStudentsState extends State<ListOfStudents> {
 
       log('Controller student list length: ${_controller.studentList.length}');
 
-      // Initialize attendance status for each student (using growable list)
+      // Load existing attendance records
+      final existingRecords = await _controller.getExistingAttendanceRecords(
+        attendanceId: widget.attendanceId,
+      );
+
+      log('Existing attendance records: ${existingRecords.length}');
+
+      // Create a map for quick lookup of existing attendance
+      Map<String, dynamic> existingAttendanceMap = {};
+      for (var record in existingRecords) {
+        final studentId = record['student_id'] ?? record['id'];
+        if (studentId != null) {
+          existingAttendanceMap[studentId] = record;
+        }
+      }
+
+      // Initialize attendance status for each student
       isPresent.value =
           List.generate(_controller.studentList.length, (_) => false);
-      // Initialize student records
+
+      // Initialize student records and check existing attendance
       studentRecord.clear();
-      for (var student in _controller.studentList) {
+      for (int i = 0; i < _controller.studentList.length; i++) {
+        var student = _controller.studentList[i];
+        final studentId = student['id'];
+
+        // Check if this student has existing attendance record
+        bool isAlreadyPresent = false;
+        String presentStatus = 'X';
+
+        if (existingAttendanceMap.containsKey(studentId)) {
+          var existingRecord = existingAttendanceMap[studentId];
+          final status = existingRecord['status'] ?? existingRecord['present'];
+
+          // Check if student is marked as present
+          if (status == 'present' || status == '✓') {
+            isAlreadyPresent = true;
+            presentStatus = '✓';
+            isPresent[i] = true;
+            log('Student ${student['full_name']} is already marked as present');
+          }
+        }
+
+        // Get attendance type from existing record (face or manual)
+        String attendanceType = 'manual';
+        if (existingAttendanceMap.containsKey(studentId)) {
+          var existingRecord = existingAttendanceMap[studentId];
+          attendanceType = existingRecord['attendance_type'] ?? 'manual';
+        }
+
         studentRecord.add({
-          'id': student['id'],
+          'id': studentId,
+          'student_id': studentId,
           'name': student['full_name'] ?? student['name'],
-          'present': 'X',
+          'student_name': student['full_name'] ?? student['name'],
+          'present': presentStatus,
+          'status': isAlreadyPresent ? 'present' : 'absent',
+          'attendance_type': attendanceType,
         });
       }
 
       log('Student records initialized: ${studentRecord.length}');
+      log('Students marked present: ${isPresent.where((p) => p).length}');
     } else {
       log('Subject ID is empty, cannot load students');
     }
@@ -145,7 +194,43 @@ class _ListOfStudentsState extends State<ListOfStudents> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
+                // Legend for attendance type icons
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.camera_alt, color: Colors.blue, size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Face Recognition',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.blue.shade900,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Icon(Icons.touch_app, color: Colors.orange, size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Manual',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.orange.shade900,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
                 Expanded(
                   child: Obx(() {
                     final studentList = _controller.studentList;
@@ -177,54 +262,7 @@ class _ListOfStudentsState extends State<ListOfStudents> {
                     return _buildScrollableTable(_controller.studentList, size);
                   }),
                 ),
-                if (!widget.isSubmitted)
-                  Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: blue,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: blue.withOpacity(0.3),
-                          spreadRadius: 1,
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => FaceRecognitionPage(),
-                          ),
-                        );
-                      },
-                      icon: Icon(
-                        Icons.camera_enhance,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                      label: Text(
-                        'Face Recognition',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.transparent,
-                        shadowColor: Colors.transparent,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                    ),
-                  ),
-                if (!widget.isSubmitted) const SizedBox(height: 16),
+                const SizedBox(height: 16),
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -313,22 +351,12 @@ class _ListOfStudentsState extends State<ListOfStudents> {
             columns: [
               DataColumn(label: Text('No.')),
               DataColumn(label: Text('Name')),
-              DataColumn(label: Text('Present ✓')),
+              DataColumn(label: Text('Status')),
+              DataColumn(label: Text('Type')),
             ],
             rows: data.asMap().entries.map((entry) {
               int index = entry.key;
               Map<String, dynamic> student = entry.value;
-
-              if (studentRecord.length < data.length) {
-                studentRecord.add({
-                  'id': student['id'],
-                  'name': student['full_name'] ?? student['name'],
-                  'present':
-                      (index < isPresent.length && isPresent[index] == false)
-                          ? 'X'
-                          : '✓',
-                });
-              }
 
               return DataRow(cells: [
                 DataCell(Text('${index + 1}')),
@@ -336,9 +364,12 @@ class _ListOfStudentsState extends State<ListOfStudents> {
                     Text(student['full_name'] ?? student['name'] ?? 'N/A')),
                 DataCell(widget.isSubmitted
                     ? Text(
-                        student['present'] ?? 'N/A',
+                        index < studentRecord.length
+                            ? studentRecord[index]['present'] ?? 'N/A'
+                            : 'N/A',
                         style: TextStyle(
-                            color: student['present'] == '✓'
+                            color: (index < studentRecord.length &&
+                                    studentRecord[index]['present'] == '✓')
                                 ? Colors.green
                                 : Colors.red),
                       )
@@ -355,13 +386,29 @@ class _ListOfStudentsState extends State<ListOfStudents> {
                           // Update student record with bounds checking
                           if (index < studentRecord.length) {
                             studentRecord[index]['present'] =
-                                (index < isPresent.length &&
-                                        isPresent[index] == false)
-                                    ? 'X'
-                                    : '✓';
+                                (value == true) ? '✓' : 'X';
+                            studentRecord[index]['status'] =
+                                (value == true) ? 'present' : 'absent';
+                            // When manually checked, mark as manual type
+                            studentRecord[index]['attendance_type'] = 'manual';
                           }
                         },
                       )),
+                // Type column with icon
+                DataCell(
+                  index < studentRecord.length
+                      ? Icon(
+                          studentRecord[index]['attendance_type'] == 'face'
+                              ? Icons.camera_alt
+                              : Icons.touch_app,
+                          color:
+                              studentRecord[index]['attendance_type'] == 'face'
+                                  ? Colors.blue
+                                  : Colors.orange,
+                          size: 20,
+                        )
+                      : Icon(Icons.touch_app, color: Colors.orange, size: 20),
+                ),
               ]);
             }).toList(),
           ),
