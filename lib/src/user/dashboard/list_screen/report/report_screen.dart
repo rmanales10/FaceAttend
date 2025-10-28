@@ -175,7 +175,9 @@ class ReportScreen extends StatelessWidget {
                   ),
                 ),
                 _buildActionButton(Icons.download, Colors.green, () {
-                  final Uri downloadLink = Uri.parse(url);
+                  final String downloadUrl =
+                      'https://ustp-face-attend.site/report-download-public?attendanceId=$id';
+                  final Uri downloadLink = Uri.parse(downloadUrl);
                   launchUrl(downloadLink, mode: LaunchMode.externalApplication);
                 }),
                 SizedBox(width: 10),

@@ -264,4 +264,30 @@ class ListController extends GetxController {
       'user_id': currentUser!.uid,
     }, SetOptions(merge: true));
   }
+
+  // Save report to Firebase (for viewing in Generated Reports screen)
+  Future<void> saveReportToFirebase({
+    required String attendanceId,
+    required String subject,
+    required String section,
+    required String date,
+  }) async {
+    try {
+      await _firestore.collection('reports').doc(attendanceId).set({
+        'attendance_id': attendanceId,
+        'subject': subject,
+        'section': section,
+        'date': date,
+        'type': 'Attendance Report',
+        'url': '', // No URL for now, just displaying details
+        'user_id': currentUser!.uid,
+        'created_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      log('Report saved successfully for attendance: $attendanceId');
+    } catch (e) {
+      log('Error saving report: $e');
+      rethrow;
+    }
+  }
 }

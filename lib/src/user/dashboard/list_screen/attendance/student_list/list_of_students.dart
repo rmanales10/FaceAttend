@@ -274,7 +274,7 @@ class _ListOfStudentsState extends State<ListOfStudents> {
                   child: Text(
                     !widget.isSubmitted
                         ? 'Note! You can only submit once'
-                        : 'Note! Generate to Word only',
+                        : 'Note! Save to view in Generated Reports',
                     style: TextStyle(
                       fontStyle: FontStyle.italic,
                       color: Colors.red[700],
@@ -308,10 +308,15 @@ class _ListOfStudentsState extends State<ListOfStudents> {
                                 message: 'Attendance submitted successfully!');
                           }
                         : () async {
-                            // Report generation removed
+                            // Save report to Firebase
+                            await _controller.saveReportToFirebase(
+                              attendanceId: widget.attendanceId,
+                              subject: widget.subject,
+                              section: widget.section,
+                              date: widget.date,
+                            );
                             Get.back();
-                            showSuccess(
-                                message: 'Attendance already submitted!');
+                            showSuccess(message: 'Report saved successfully!');
                           },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: blue,
@@ -321,7 +326,7 @@ class _ListOfStudentsState extends State<ListOfStudents> {
                       elevation: 2,
                     ),
                     child: Text(
-                      !widget.isSubmitted ? 'Submit' : 'Generate Report...',
+                      !widget.isSubmitted ? 'Submit' : 'Save Report',
                       style: TextStyle(
                         fontSize: 16,
                         color: Colors.white,
