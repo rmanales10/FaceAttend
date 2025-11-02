@@ -5,6 +5,7 @@ import 'package:app_attend/src/widgets/color_constant.dart';
 import 'package:app_attend/src/widgets/snackbar_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ListOfStudents extends StatefulWidget {
   final String subject;
@@ -106,9 +107,20 @@ class _ListOfStudentsState extends State<ListOfStudents> {
 
         // Get attendance type from existing record (face or manual)
         String attendanceType = 'manual';
+        String timeIn = '';
         if (existingAttendanceMap.containsKey(studentId)) {
           var existingRecord = existingAttendanceMap[studentId];
           attendanceType = existingRecord['attendance_type'] ?? 'manual';
+          // Get existing time_in if available
+          if (existingRecord['time_in'] != null) {
+            timeIn = existingRecord['time_in'];
+          } else if (existingRecord['timestamp'] != null) {
+            // Convert timestamp to readable time format
+            var timestamp = existingRecord['timestamp'];
+            if (timestamp is Timestamp) {
+              timeIn = _formatTime(timestamp.toDate());
+            }
+          }
         }
 
         studentRecord.add({
@@ -119,6 +131,7 @@ class _ListOfStudentsState extends State<ListOfStudents> {
           'present': presentStatus,
           'status': isAlreadyPresent ? 'present' : 'absent',
           'attendance_type': attendanceType,
+          'time_in': timeIn,
         });
       }
 
@@ -245,6 +258,16 @@ class _ListOfStudentsState extends State<ListOfStudents> {
         ),
       ),
     );
+  }
+
+  String _formatTime(DateTime dateTime) {
+    int hour = dateTime.hour;
+    int minute = dateTime.minute;
+    String period = hour >= 12 ? 'PM' : 'AM';
+    int displayHour = hour % 12;
+    if (displayHour == 0) displayHour = 12;
+    String minuteStr = minute.toString().padLeft(2, '0');
+    return '$displayHour:$minuteStr $period';
   }
 
   Widget _buildDetailRow({
@@ -580,70 +603,152 @@ class _ListOfStudentsState extends State<ListOfStudents> {
       scrollDirection: Axis.vertical,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        child: SizedBox(
-          width: size.width,
-          height: size.height,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minWidth: size.width,
+            maxWidth:
+                800, // Maximum width to allow horizontal scroll on smaller screens
+          ),
           child: DataTable(
+            columnSpacing: 12,
             columns: [
-              DataColumn(label: Text('No.')),
-              DataColumn(label: Text('Name')),
-              DataColumn(label: Text('Status')),
-              DataColumn(label: Text('Type')),
+              DataColumn(
+                label: SizedBox(
+                  width: 40,
+                  child: Text('No.', overflow: TextOverflow.ellipsis),
+                ),
+              ),
+              DataColumn(
+                label: SizedBox(
+                  width: 120,
+                  child: Text('Name', overflow: TextOverflow.ellipsis),
+                ),
+              ),
+              DataColumn(
+                label: SizedBox(
+                  width: 60,
+                  child: Text('Status', overflow: TextOverflow.ellipsis),
+                ),
+              ),
+              DataColumn(
+                label: SizedBox(
+                  width: 80,
+                  child: Text('Time In', overflow: TextOverflow.ellipsis),
+                ),
+              ),
+              DataColumn(
+                label: SizedBox(
+                  width: 60,
+                  child: Text('Type', overflow: TextOverflow.ellipsis),
+                ),
+              ),
             ],
             rows: data.asMap().entries.map((entry) {
               int index = entry.key;
               Map<String, dynamic> student = entry.value;
 
               return DataRow(cells: [
-                DataCell(Text('${index + 1}')),
                 DataCell(
-                    Text(student['full_name'] ?? student['name'] ?? 'N/A')),
-                DataCell(widget.isSubmitted
-                    ? Text(
-                        index < studentRecord.length
-                            ? studentRecord[index]['present'] ?? 'N/A'
-                            : 'N/A',
-                        style: TextStyle(
-                            color: (index < studentRecord.length &&
-                                    studentRecord[index]['present'] == '✓')
-                                ? Colors.green
-                                : Colors.red),
-                      )
-                    : Checkbox(
-                        value:
-                            index < isPresent.length ? isPresent[index] : false,
-                        onChanged: (value) {
-                          setState(() {
-                            if (index < isPresent.length) {
-                              isPresent[index] = value ?? false;
-                            }
-                          });
+                  SizedBox(
+                    width: 40,
+                    child: Text('${index + 1}'),
+                  ),
+                ),
+                DataCell(
+                  SizedBox(
+                    width: 120,
+                    child: Text(
+                      student['full_name'] ?? student['name'] ?? 'N/A',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+                DataCell(
+                  SizedBox(
+                    width: 60,
+                    child: widget.isSubmitted
+                        ? Text(
+                            index < studentRecord.length
+                                ? studentRecord[index]['present'] ?? 'N/A'
+                                : 'N/A',
+                            style: TextStyle(
+                                color: (index < studentRecord.length &&
+                                        studentRecord[index]['present'] == '✓')
+                                    ? Colors.green
+                                    : Colors.red),
+                          )
+                        : Checkbox(
+                            value: index < isPresent.length
+                                ? isPresent[index]
+                                : false,
+                            onChanged: (value) {
+                              setState(() {
+                                if (index < isPresent.length) {
+                                  isPresent[index] = value ?? false;
+                                }
+                              });
 
-                          // Update student record with bounds checking
-                          if (index < studentRecord.length) {
-                            studentRecord[index]['present'] =
-                                (value == true) ? '✓' : 'X';
-                            studentRecord[index]['status'] =
-                                (value == true) ? 'present' : 'absent';
-                            // When manually checked, mark as manual type
-                            studentRecord[index]['attendance_type'] = 'manual';
-                          }
-                        },
-                      )),
+                              // Update student record with bounds checking
+                              if (index < studentRecord.length) {
+                                studentRecord[index]['present'] =
+                                    (value == true) ? '✓' : 'X';
+                                studentRecord[index]['status'] =
+                                    (value == true) ? 'present' : 'absent';
+                                // When manually checked, mark as manual type
+                                studentRecord[index]['attendance_type'] =
+                                    'manual';
+                                // Record time when manually marking attendance
+                                if (value == true) {
+                                  studentRecord[index]['time_in'] =
+                                      _formatTime(DateTime.now());
+                                } else {
+                                  studentRecord[index]['time_in'] = '';
+                                }
+                              }
+                            },
+                          ),
+                  ),
+                ),
+                // Time In column
+                DataCell(
+                  SizedBox(
+                    width: 80,
+                    child: Text(
+                      index < studentRecord.length
+                          ? (studentRecord[index]['time_in'] ?? '')
+                          : '',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: (index < studentRecord.length &&
+                                studentRecord[index]['time_in'] != null &&
+                                studentRecord[index]['time_in']
+                                    .toString()
+                                    .isNotEmpty)
+                            ? Colors.blue[700]
+                            : Colors.grey,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
                 // Type column with icon
                 DataCell(
-                  index < studentRecord.length
-                      ? Icon(
-                          studentRecord[index]['attendance_type'] == 'face'
-                              ? Icons.camera_alt
-                              : Icons.touch_app,
-                          color:
-                              studentRecord[index]['attendance_type'] == 'face'
-                                  ? Colors.blue
-                                  : Colors.orange,
-                          size: 20,
-                        )
-                      : Icon(Icons.touch_app, color: Colors.orange, size: 20),
+                  SizedBox(
+                    width: 30,
+                    child: index < studentRecord.length
+                        ? Icon(
+                            studentRecord[index]['attendance_type'] == 'face'
+                                ? Icons.camera_alt
+                                : Icons.touch_app,
+                            color: studentRecord[index]['attendance_type'] ==
+                                    'face'
+                                ? Colors.blue
+                                : Colors.orange,
+                            size: 20,
+                          )
+                        : Icon(Icons.touch_app, color: Colors.orange, size: 20),
+                  ),
                 ),
               ]);
             }).toList(),

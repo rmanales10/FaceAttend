@@ -95,8 +95,17 @@ class CreateController extends GetxController {
   RxList<Map<String, dynamic>> classSchedules = <Map<String, dynamic>>[].obs;
   Future<void> fetchAllClassSchedules() async {
     try {
-      QuerySnapshot querySnapshot =
-          await _firestore.collection('classSchedules').get();
+      if (currentUser == null) {
+        log('No authenticated user');
+        classSchedules.value = [];
+        return;
+      }
+
+      // Filter class schedules by the current teacher's UID
+      QuerySnapshot querySnapshot = await _firestore
+          .collection('classSchedules')
+          .where('teacher_id', isEqualTo: currentUser!.uid)
+          .get();
 
       classSchedules.value = querySnapshot.docs
           .map((doc) => {
@@ -116,7 +125,7 @@ class CreateController extends GetxController {
               })
           .toList();
 
-      log('Fetched ${classSchedules.length} class schedules');
+      log('Fetched ${classSchedules.length} class schedules for teacher ${currentUser!.uid}');
     } catch (e) {
       log('Error fetching class schedules: $e');
       classSchedules.value = [];
