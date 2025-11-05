@@ -3,6 +3,8 @@ import 'dart:math' as rnd;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
+import 'package:app_attend/src/services/notification_service.dart';
+import 'package:app_attend/src/user/dashboard/list_screen/notifications/notification_controller.dart';
 
 class ListController extends GetxController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -120,22 +122,51 @@ class ListController extends GetxController {
     required var section,
   }) async {
     try {
-      // Calculate attendance statistics
+      // Calculate attendance statistics based on state
       int totalStudents = studentRecord.length;
-      int presentCount =
-          studentRecord.where((record) => record['present'] == '✓').length;
-      int absentCount = totalStudents - presentCount;
+      int presentCount = studentRecord
+          .where((record) =>
+              (record['state'] == 'Present' || record['status'] == 'present') &&
+              record['state'] != 'Late' &&
+              record['state'] != 'Absent')
+          .length;
+      int lateCount = studentRecord
+          .where((record) =>
+              record['state'] == 'Late' || record['status'] == 'late')
+          .length;
+      int absentCount = studentRecord
+          .where((record) =>
+              record['state'] == 'Absent' || record['status'] == 'absent')
+          .length;
 
       log('Attendance Summary:');
       log('Total Students: $totalStudents');
       log('Present: $presentCount');
+      log('Late: $lateCount');
       log('Absent: $absentCount');
+
+      // Update student records to ensure status matches state
+      for (var record in studentRecord) {
+        String state = record['state'] ?? 'Absent';
+        if (state == 'Absent') {
+          record['status'] = 'absent';
+          record['present'] = 'X';
+        } else if (state == 'Late') {
+          record['status'] = 'late';
+          record['present'] = 'L';
+        } else {
+          // Present
+          record['status'] = 'present';
+          record['present'] = '✓';
+        }
+      }
 
       // Update the classAttendance document with student records and statistics
       await _firestore.collection('classAttendance').doc(attendanceId).update({
         'attendance_records': studentRecord,
         'total_students': totalStudents,
         'present_count': presentCount,
+        'late_count': lateCount,
         'absent_count': absentCount,
         'is_submitted': true,
         'status': 'completed',
@@ -158,8 +189,151 @@ class ListController extends GetxController {
       }, SetOptions(merge: true));
 
       log('Attendance records saved successfully!');
+
+      // Create internal notification
+      await _createInternalNotification(
+        subject: subject,
+        section: section,
+        date: datenow,
+        presentCount: presentCount,
+        absentCount: absentCount,
+        totalStudents: totalStudents,
+      );
+
+      // Send notifications after successful submission
+      await _sendNotifications(
+        subject: subject,
+        section: section,
+        date: datenow,
+        teacherName: teacher,
+        presentCount: presentCount,
+        absentCount: absentCount,
+        totalStudents: totalStudents,
+        studentIds: studentRecord
+            .map((r) => r['student_id'] ?? r['id'])
+            .whereType<String>()
+            .toList(),
+      );
     } catch (e) {
       log('Error adding attendance record: $e');
+    }
+  }
+
+  /// Send notifications to students and teacher
+  Future<void> _sendNotifications({
+    required String subject,
+    required String section,
+    required String date,
+    required String teacherName,
+    required int presentCount,
+    required int absentCount,
+    required int totalStudents,
+    required List<String> studentIds,
+  }) async {
+    try {
+      final notificationService = NotificationService();
+      List<String> phoneNumbers = [];
+      List<String> emailAddresses = [];
+
+      // Get teacher contact info
+      if (currentUser != null) {
+        DocumentSnapshot teacherDoc =
+            await _firestore.collection('users').doc(currentUser!.uid).get();
+
+        if (teacherDoc.exists) {
+          var teacherData = teacherDoc.data() as Map<String, dynamic>;
+          String? teacherPhone = teacherData['phone']?.toString();
+          String? teacherEmail = teacherData['email']?.toString();
+
+          if (teacherPhone != null && teacherPhone.isNotEmpty) {
+            phoneNumbers.add(teacherPhone);
+          }
+          if (teacherEmail != null && teacherEmail.isNotEmpty) {
+            emailAddresses.add(teacherEmail);
+          }
+        }
+      }
+
+      // Get student contact info
+      for (String studentId in studentIds) {
+        try {
+          DocumentSnapshot studentDoc =
+              await _firestore.collection('students').doc(studentId).get();
+
+          if (studentDoc.exists) {
+            var studentData = studentDoc.data() as Map<String, dynamic>;
+            String? studentPhone = studentData['phone']?.toString();
+            String? studentEmail = studentData['email']?.toString();
+
+            if (studentPhone != null && studentPhone.isNotEmpty) {
+              phoneNumbers.add(studentPhone);
+            }
+            if (studentEmail != null && studentEmail.isNotEmpty) {
+              emailAddresses.add(studentEmail);
+            }
+          }
+        } catch (e) {
+          log('Error fetching student contact info for $studentId: $e');
+        }
+      }
+
+      // Send notifications if we have contact info
+      if (phoneNumbers.isNotEmpty || emailAddresses.isNotEmpty) {
+        log('Sending notifications to ${phoneNumbers.length} phone numbers and ${emailAddresses.length} email addresses');
+
+        final results = await notificationService.sendAttendanceNotifications(
+          phoneNumbers: phoneNumbers,
+          emailAddresses: emailAddresses,
+          subject: subject,
+          section: section,
+          date: date,
+          teacherName: teacherName,
+          presentCount: presentCount,
+          absentCount: absentCount,
+          totalStudents: totalStudents,
+        );
+
+        log('Notification results - SMS: ${results['sms']}, Email: ${results['email']}');
+      } else {
+        log('No contact information found for notifications');
+      }
+    } catch (e) {
+      log('Error sending notifications: $e');
+      // Don't throw - notifications are not critical for attendance submission
+    }
+  }
+
+  /// Create internal notification for attendance submission
+  Future<void> _createInternalNotification({
+    required String subject,
+    required String section,
+    required String date,
+    required int presentCount,
+    required int absentCount,
+    required int totalStudents,
+  }) async {
+    try {
+      if (currentUser != null) {
+        await NotificationController.createNotification(
+          userId: currentUser!.uid,
+          title: 'Attendance Submitted',
+          message:
+              '$subject ($section) - Present: $presentCount, Absent: $absentCount, Total: $totalStudents on $date',
+          type: 'attendance',
+          data: {
+            'subject': subject,
+            'section': section,
+            'date': date,
+            'present_count': presentCount,
+            'absent_count': absentCount,
+            'total_students': totalStudents,
+          },
+        );
+        log('Internal notification created for attendance submission');
+      }
+    } catch (e) {
+      log('Error creating internal notification: $e');
+      // Don't throw - internal notifications are not critical
     }
   }
 

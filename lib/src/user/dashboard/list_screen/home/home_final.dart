@@ -4,6 +4,8 @@ import 'dart:developer';
 import 'package:app_attend/src/user/api_services/auth_service.dart';
 
 import 'package:app_attend/src/user/dashboard/list_screen/home/home_controller.dart';
+import 'package:app_attend/src/user/dashboard/list_screen/notifications/notification_controller.dart';
+import 'package:app_attend/src/user/dashboard/list_screen/notifications/notification_screen.dart';
 import 'package:app_attend/src/user/dashboard/list_screen/profile/profile_controller.dart';
 import 'package:app_attend/src/widgets/color_constant.dart';
 import 'package:app_attend/src/widgets/time_clock.dart';
@@ -28,6 +30,8 @@ class _HomeFinalState extends State<HomeFinal> {
   late HomeController _controller;
   late final ProfileController _profileController =
       Get.put(ProfileController());
+  late final NotificationController _notificationController =
+      Get.put(NotificationController());
   final selectedSubject = RxnString();
   final subjectNames = RxList<String>();
   Rx<DateTime> date = DateTime.now().obs;
@@ -118,25 +122,68 @@ class _HomeFinalState extends State<HomeFinal> {
             letterSpacing: 0.5,
           ),
         ),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.1),
-                spreadRadius: 1,
-                blurRadius: 5,
-                offset: const Offset(0, 3),
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 1,
+                    blurRadius: 5,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: IconButton(
-            icon: Icon(Icons.notifications, color: blue),
-            onPressed: () {
-              // Handle notifications
-            },
-          ),
+              child: IconButton(
+                icon: Icon(Icons.notifications, color: blue),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const NotificationScreen(),
+                    ),
+                  );
+                },
+              ),
+            ),
+            Obx(() {
+              if (_notificationController.unreadCount.value > 0) {
+                return Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
+                    child: Center(
+                      child: Text(
+                        _notificationController.unreadCount.value > 9
+                            ? '9+'
+                            : '${_notificationController.unreadCount.value}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            }),
+          ],
         ),
       ],
     );

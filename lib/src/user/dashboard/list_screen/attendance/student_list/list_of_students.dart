@@ -96,12 +96,17 @@ class _ListOfStudentsState extends State<ListOfStudents> {
           var existingRecord = existingAttendanceMap[studentId];
           final status = existingRecord['status'] ?? existingRecord['present'];
 
-          // Check if student is marked as present
+          // Check if student is marked as present or late
           if (status == 'present' || status == '✓') {
             isAlreadyPresent = true;
             presentStatus = '✓';
             isPresent[i] = true;
             log('Student ${student['full_name']} is already marked as present');
+          } else if (status == 'late' || status == 'L') {
+            isAlreadyPresent = true;
+            presentStatus = 'L';
+            isPresent[i] = true;
+            log('Student ${student['full_name']} is already marked as late');
           }
         }
 
@@ -123,13 +128,48 @@ class _ListOfStudentsState extends State<ListOfStudents> {
           }
         }
 
+        // Determine initial state (if already present, check if they were late)
+        String initialState = 'Absent';
+        if (existingAttendanceMap.containsKey(studentId)) {
+          var existingRecord = existingAttendanceMap[studentId];
+          // Check state field first, then fall back to status
+          if (existingRecord['state'] != null) {
+            initialState = existingRecord['state'].toString();
+          } else if (existingRecord['status'] == 'late') {
+            initialState = 'Late';
+            presentStatus = 'L';
+          } else if (existingRecord['status'] == 'present') {
+            initialState = 'Present';
+            presentStatus = '✓';
+          } else {
+            initialState = 'Absent';
+            presentStatus = 'X';
+          }
+        }
+
+        // Ensure presentStatus matches initialState
+        if (initialState == 'Late') {
+          presentStatus = 'L';
+        } else if (initialState == 'Present') {
+          presentStatus = '✓';
+        } else {
+          presentStatus = 'X';
+        }
+
         studentRecord.add({
           'id': studentId,
           'student_id': studentId,
           'name': student['full_name'] ?? student['name'],
           'student_name': student['full_name'] ?? student['name'],
           'present': presentStatus,
-          'status': isAlreadyPresent ? 'present' : 'absent',
+          'status': isAlreadyPresent
+              ? (initialState == 'Late'
+                  ? 'late'
+                  : initialState == 'Present'
+                      ? 'present'
+                      : 'absent')
+              : 'absent',
+          'state': initialState,
           'attendance_type': attendanceType,
           'time_in': timeIn,
         });
@@ -638,6 +678,12 @@ class _ListOfStudentsState extends State<ListOfStudents> {
               ),
               DataColumn(
                 label: SizedBox(
+                  width: 80,
+                  child: Text('State', overflow: TextOverflow.ellipsis),
+                ),
+              ),
+              DataColumn(
+                label: SizedBox(
                   width: 60,
                   child: Text('Type', overflow: TextOverflow.ellipsis),
                 ),
@@ -667,15 +713,37 @@ class _ListOfStudentsState extends State<ListOfStudents> {
                   SizedBox(
                     width: 60,
                     child: widget.isSubmitted
-                        ? Text(
-                            index < studentRecord.length
-                                ? studentRecord[index]['present'] ?? 'N/A'
-                                : 'N/A',
-                            style: TextStyle(
-                                color: (index < studentRecord.length &&
-                                        studentRecord[index]['present'] == '✓')
-                                    ? Colors.green
-                                    : Colors.red),
+                        ? Builder(
+                            builder: (context) {
+                              if (index >= studentRecord.length) {
+                                return Text('N/A');
+                              }
+
+                              String state =
+                                  studentRecord[index]['state'] ?? 'Absent';
+                              String statusDisplay;
+                              Color statusColor;
+
+                              if (state == 'Present') {
+                                statusDisplay = '✓';
+                                statusColor = Colors.green;
+                              } else if (state == 'Late') {
+                                statusDisplay = 'L';
+                                statusColor = Colors.orange;
+                              } else {
+                                statusDisplay = 'X';
+                                statusColor = Colors.red;
+                              }
+
+                              return Text(
+                                statusDisplay,
+                                style: TextStyle(
+                                  color: statusColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              );
+                            },
                           )
                         : Checkbox(
                             value: index < isPresent.length
@@ -690,20 +758,22 @@ class _ListOfStudentsState extends State<ListOfStudents> {
 
                               // Update student record with bounds checking
                               if (index < studentRecord.length) {
-                                studentRecord[index]['present'] =
-                                    (value == true) ? '✓' : 'X';
-                                studentRecord[index]['status'] =
-                                    (value == true) ? 'present' : 'absent';
-                                // When manually checked, mark as manual type
-                                studentRecord[index]['attendance_type'] =
-                                    'manual';
-                                // Record time when manually marking attendance
+                                // When manually checked, default to 'Present' state
                                 if (value == true) {
+                                  studentRecord[index]['status'] = 'present';
+                                  studentRecord[index]['state'] = 'Present';
+                                  studentRecord[index]['present'] = '✓';
                                   studentRecord[index]['time_in'] =
                                       _formatTime(DateTime.now());
                                 } else {
+                                  studentRecord[index]['status'] = 'absent';
+                                  studentRecord[index]['state'] = 'Absent';
+                                  studentRecord[index]['present'] = 'X';
                                   studentRecord[index]['time_in'] = '';
                                 }
+                                // When manually checked, mark as manual type
+                                studentRecord[index]['attendance_type'] =
+                                    'manual';
                               }
                             },
                           ),
@@ -730,6 +800,117 @@ class _ListOfStudentsState extends State<ListOfStudents> {
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
+                  ),
+                ),
+                // State column with dropdown
+                DataCell(
+                  SizedBox(
+                    width: 80,
+                    child: widget.isSubmitted
+                        ? Text(
+                            index < studentRecord.length
+                                ? (studentRecord[index]['state'] ?? 'Absent')
+                                : 'Absent',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: index < studentRecord.length &&
+                                      studentRecord[index]['state'] == 'Late'
+                                  ? Colors.orange[700]
+                                  : index < studentRecord.length &&
+                                          studentRecord[index]['state'] ==
+                                              'Present'
+                                      ? Colors.green[700]
+                                      : Colors.red[700],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          )
+                        : index < studentRecord.length
+                            ? DropdownButton<String>(
+                                value:
+                                    studentRecord[index]['state'] ?? 'Absent',
+                                isExpanded: true,
+                                underline: Container(),
+                                items: ['Present', 'Late', 'Absent']
+                                    .map((String value) {
+                                  Color textColor;
+                                  if (value == 'Late') {
+                                    textColor = Colors.orange[700]!;
+                                  } else if (value == 'Present') {
+                                    textColor = Colors.green[700]!;
+                                  } else {
+                                    textColor = Colors.red[700]!;
+                                  }
+                                  return DropdownMenuItem<String>(
+                                    value: value,
+                                    child: Text(
+                                      value,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: textColor,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (String? newValue) {
+                                  if (newValue != null &&
+                                      index < studentRecord.length) {
+                                    setState(() {
+                                      studentRecord[index]['state'] = newValue;
+
+                                      // Update checkbox and status based on state
+                                      if (newValue == 'Absent') {
+                                        // Uncheck the checkbox
+                                        if (index < isPresent.length) {
+                                          isPresent[index] = false;
+                                        }
+                                        studentRecord[index]['present'] = 'X';
+                                        studentRecord[index]['status'] =
+                                            'absent';
+                                        studentRecord[index]['time_in'] = '';
+                                      } else {
+                                        // Check the checkbox
+                                        if (index < isPresent.length) {
+                                          isPresent[index] = true;
+                                        }
+
+                                        // Update status and present symbol based on state
+                                        if (newValue == 'Late') {
+                                          studentRecord[index]['status'] =
+                                              'late';
+                                          studentRecord[index]['present'] = 'L';
+                                        } else {
+                                          studentRecord[index]['status'] =
+                                              'present';
+                                          studentRecord[index]['present'] = '✓';
+                                        }
+
+                                        // Record time when marking as present/late
+                                        if (studentRecord[index]['time_in'] ==
+                                                null ||
+                                            studentRecord[index]['time_in']
+                                                .toString()
+                                                .isEmpty) {
+                                          studentRecord[index]['time_in'] =
+                                              _formatTime(DateTime.now());
+                                        }
+                                      }
+
+                                      // Mark as manual type when changed via dropdown
+                                      studentRecord[index]['attendance_type'] =
+                                          'manual';
+                                    });
+                                  }
+                                },
+                              )
+                            : Text(
+                                'Absent',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                   ),
                 ),
                 // Type column with icon
