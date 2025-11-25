@@ -128,11 +128,16 @@ class ListController extends GetxController {
           .where((record) =>
               (record['state'] == 'Present' || record['status'] == 'present') &&
               record['state'] != 'Late' &&
-              record['state'] != 'Absent')
+              record['state'] != 'Absent' &&
+              record['state'] != 'Excuse')
           .length;
       int lateCount = studentRecord
           .where((record) =>
               record['state'] == 'Late' || record['status'] == 'late')
+          .length;
+      int excuseCount = studentRecord
+          .where((record) =>
+              record['state'] == 'Excuse' || record['status'] == 'excuse')
           .length;
       int absentCount = studentRecord
           .where((record) =>
@@ -143,6 +148,7 @@ class ListController extends GetxController {
       log('Total Students: $totalStudents');
       log('Present: $presentCount');
       log('Late: $lateCount');
+      log('Excuse: $excuseCount');
       log('Absent: $absentCount');
 
       // Update student records to ensure status matches state
@@ -154,6 +160,9 @@ class ListController extends GetxController {
         } else if (state == 'Late') {
           record['status'] = 'late';
           record['present'] = 'L';
+        } else if (state == 'Excuse') {
+          record['status'] = 'excuse';
+          record['present'] = 'E';
         } else {
           // Present
           record['status'] = 'present';
@@ -167,6 +176,7 @@ class ListController extends GetxController {
         'total_students': totalStudents,
         'present_count': presentCount,
         'late_count': lateCount,
+        'excuse_count': excuseCount,
         'absent_count': absentCount,
         'is_submitted': true,
         'status': 'completed',

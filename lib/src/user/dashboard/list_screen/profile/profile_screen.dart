@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'dart:ui' as ui;
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -399,37 +400,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final ImagePicker picker = ImagePicker();
 
     try {
-      // Pick an image from gallery
-      final XFile? pickedFile =
-          await picker.pickImage(source: ImageSource.gallery);
+      // Pick an image from gallery with compression settings
+      final XFile? pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800, // Max width for compression
+        maxHeight: 800, // Max height for compression
+        imageQuality: 70, // Quality: 0-100 (lower = smaller file)
+      );
 
       if (pickedFile != null) {
         // Check if the platform is Web
         if (kIsWeb) {
-          // Web: Use 'readAsBytes' to process the picked image
+          // Web: Compress and process the picked image
           final Uint8List webImageBytes = await pickedFile.readAsBytes();
 
+          // Compress image for web
+          final compressedBytes = await _compressImageWeb(webImageBytes);
+
           setState(() {
-            base64Image = base64Encode(webImageBytes);
+            base64Image = base64Encode(compressedBytes);
           });
           await _controller.storeImage(image: base64Image);
 
-          log("Image selected on Web: ${webImageBytes.lengthInBytes} bytes");
+          log("Image selected on Web: Original: ${webImageBytes.lengthInBytes} bytes, Compressed: ${compressedBytes.lengthInBytes} bytes");
         } else {
           // Native (Android/iOS): Use File to get image bytes
           final File nativeImageFile = File(pickedFile.path);
 
           // Ensure that the file exists
           if (await nativeImageFile.exists()) {
-            final Uint8List nativeImageBytes =
-                await nativeImageFile.readAsBytes();
+            // Get original file size
+            final originalSize = await nativeImageFile.length();
+
+            // Compress the image
+            final compressedBytes = await _compressImageNative(nativeImageFile);
 
             setState(() {
-              base64Image = base64Encode(nativeImageBytes);
+              base64Image = base64Encode(compressedBytes);
             });
             await _controller.storeImage(image: base64Image);
 
-            log("Image selected on Native: ${nativeImageFile.path}");
+            log("Image selected on Native: Original: $originalSize bytes, Compressed: ${compressedBytes.lengthInBytes} bytes");
           } else {
             log("File does not exist: ${pickedFile.path}");
           }
@@ -439,6 +450,68 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } catch (e) {
       log("Error picking image: $e");
+      showError(message: 'Failed to process image. Please try again.');
+    }
+  }
+
+  /// Compress image for web platform
+  Future<Uint8List> _compressImageWeb(Uint8List imageBytes) async {
+    try {
+      // Decode the image
+      final codec = await ui.instantiateImageCodec(
+        imageBytes,
+        targetWidth: 800,
+        targetHeight: 800,
+      );
+      final frame = await codec.getNextFrame();
+
+      // Convert to PNG format (better compression for web)
+      final byteData =
+          await frame.image.toByteData(format: ui.ImageByteFormat.png);
+      final compressedBytes = byteData!.buffer.asUint8List();
+
+      // If compressed is larger than original, return original
+      if (compressedBytes.lengthInBytes > imageBytes.lengthInBytes) {
+        return imageBytes;
+      }
+
+      return compressedBytes;
+    } catch (e) {
+      log("Error compressing image on web: $e");
+      // Return original if compression fails
+      return imageBytes;
+    }
+  }
+
+  /// Compress image for native platforms (Android/iOS)
+  Future<Uint8List> _compressImageNative(File imageFile) async {
+    try {
+      // Read original image bytes
+      final originalBytes = await imageFile.readAsBytes();
+
+      // Decode the image
+      final codec = await ui.instantiateImageCodec(
+        originalBytes,
+        targetWidth: 800,
+        targetHeight: 800,
+      );
+      final frame = await codec.getNextFrame();
+
+      // Convert to PNG format
+      final byteData =
+          await frame.image.toByteData(format: ui.ImageByteFormat.png);
+      final compressedBytes = byteData!.buffer.asUint8List();
+
+      // If compressed is larger than original, return original
+      if (compressedBytes.lengthInBytes > originalBytes.lengthInBytes) {
+        return originalBytes;
+      }
+
+      return compressedBytes;
+    } catch (e) {
+      log("Error compressing image on native: $e");
+      // Return original if compression fails
+      return await imageFile.readAsBytes();
     }
   }
 

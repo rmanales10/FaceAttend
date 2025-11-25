@@ -6,6 +6,7 @@ import 'package:app_attend/src/widgets/snackbar_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 class ListOfStudents extends StatefulWidget {
   final String subject;
@@ -34,16 +35,104 @@ class ListOfStudents extends StatefulWidget {
 class _ListOfStudentsState extends State<ListOfStudents> {
   final _controller = Get.put(ListController());
   final _profileController = Get.put(ProfileController());
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   final RxList<Map<String, dynamic>> studentRecord =
       <Map<String, dynamic>>[].obs;
 
   final RxList<bool> isPresent = <bool>[].obs;
 
+  Map<String, dynamic>? attendanceData;
+  int lateMinutes = 30; // Default late minutes
+
   @override
   void initState() {
     super.initState();
     _loadStudents();
+    _loadSettings();
+    _loadAttendanceData();
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      final querySnapshot = await _firestore.collection('settings').get();
+      if (querySnapshot.docs.isNotEmpty) {
+        final data = querySnapshot.docs.first.data();
+        setState(() {
+          lateMinutes = data['late_minutes'] ?? 30;
+        });
+      }
+    } catch (e) {
+      log('Error loading settings: $e');
+    }
+  }
+
+  Future<void> _loadAttendanceData() async {
+    try {
+      final doc = await _firestore
+          .collection('classAttendance')
+          .doc(widget.attendanceId)
+          .get();
+      if (doc.exists) {
+        setState(() {
+          attendanceData = doc.data();
+        });
+      }
+    } catch (e) {
+      log('Error loading attendance data: $e');
+    }
+  }
+
+  DateTime? _parseScheduleTime(String? scheduleString) {
+    if (scheduleString == null || scheduleString.isEmpty) return null;
+
+    try {
+      // Parse schedule like "Wed 1:31 AM - 1:30 AM" or "Mon 2:00 PM - 3:30 PM"
+      // Extract the start time (first time in the string)
+      final regex =
+          RegExp(r'(\d{1,2}):(\d{2})\s*(AM|PM)', caseSensitive: false);
+      final match = regex.firstMatch(scheduleString);
+
+      if (match == null) return null;
+
+      int hour = int.parse(match.group(1)!);
+      int minute = int.parse(match.group(2)!);
+      String period = match.group(3)!.toUpperCase();
+
+      // Convert to 24-hour format
+      int hour24 = hour;
+      if (period == 'PM' && hour != 12) {
+        hour24 = hour + 12;
+      } else if (period == 'AM' && hour == 12) {
+        hour24 = 0;
+      }
+
+      // Get today's date
+      final now = DateTime.now();
+      return DateTime(now.year, now.month, now.day, hour24, minute);
+    } catch (e) {
+      log('Error parsing schedule time: $e');
+      return null;
+    }
+  }
+
+  bool _isLate(DateTime currentTime) {
+    if (attendanceData == null) return false;
+
+    // Get schedule from class_schedule
+    final classSchedule = attendanceData!['class_schedule'];
+    if (classSchedule == null) return false;
+
+    final scheduleString = classSchedule['schedule'] as String?;
+    if (scheduleString == null) return false;
+
+    final scheduleStartTime = _parseScheduleTime(scheduleString);
+    if (scheduleStartTime == null) return false;
+
+    // Calculate late threshold
+    final lateThreshold = scheduleStartTime.add(Duration(minutes: lateMinutes));
+
+    return currentTime.isAfter(lateThreshold);
   }
 
   Future<void> _loadStudents() async {
@@ -96,7 +185,7 @@ class _ListOfStudentsState extends State<ListOfStudents> {
           var existingRecord = existingAttendanceMap[studentId];
           final status = existingRecord['status'] ?? existingRecord['present'];
 
-          // Check if student is marked as present or late
+          // Check if student is marked as present, late, or excuse
           if (status == 'present' || status == '✓') {
             isAlreadyPresent = true;
             presentStatus = '✓';
@@ -107,6 +196,11 @@ class _ListOfStudentsState extends State<ListOfStudents> {
             presentStatus = 'L';
             isPresent[i] = true;
             log('Student ${student['full_name']} is already marked as late');
+          } else if (status == 'excuse' || status == 'E') {
+            isAlreadyPresent = true;
+            presentStatus = 'E';
+            isPresent[i] = true;
+            log('Student ${student['full_name']} is already marked as excuse');
           }
         }
 
@@ -128,7 +222,7 @@ class _ListOfStudentsState extends State<ListOfStudents> {
           }
         }
 
-        // Determine initial state (if already present, check if they were late)
+        // Determine initial state (if already present, check if they were late or excuse)
         String initialState = 'Absent';
         if (existingAttendanceMap.containsKey(studentId)) {
           var existingRecord = existingAttendanceMap[studentId];
@@ -138,6 +232,9 @@ class _ListOfStudentsState extends State<ListOfStudents> {
           } else if (existingRecord['status'] == 'late') {
             initialState = 'Late';
             presentStatus = 'L';
+          } else if (existingRecord['status'] == 'excuse') {
+            initialState = 'Excuse';
+            presentStatus = 'E';
           } else if (existingRecord['status'] == 'present') {
             initialState = 'Present';
             presentStatus = '✓';
@@ -150,6 +247,8 @@ class _ListOfStudentsState extends State<ListOfStudents> {
         // Ensure presentStatus matches initialState
         if (initialState == 'Late') {
           presentStatus = 'L';
+        } else if (initialState == 'Excuse') {
+          presentStatus = 'E';
         } else if (initialState == 'Present') {
           presentStatus = '✓';
         } else {
@@ -165,9 +264,11 @@ class _ListOfStudentsState extends State<ListOfStudents> {
           'status': isAlreadyPresent
               ? (initialState == 'Late'
                   ? 'late'
-                  : initialState == 'Present'
-                      ? 'present'
-                      : 'absent')
+                  : initialState == 'Excuse'
+                      ? 'excuse'
+                      : initialState == 'Present'
+                          ? 'present'
+                          : 'absent')
               : 'absent',
           'state': initialState,
           'attendance_type': attendanceType,
@@ -308,6 +409,37 @@ class _ListOfStudentsState extends State<ListOfStudents> {
     if (displayHour == 0) displayHour = 12;
     String minuteStr = minute.toString().padLeft(2, '0');
     return '$displayHour:$minuteStr $period';
+  }
+
+  String _formatDateForDisplay(String dateString) {
+    try {
+      // Try to parse the date string in various formats
+      DateTime? date;
+
+      // Try MM/dd/yyyy format first
+      try {
+        date = DateFormat('MM/dd/yyyy').parse(dateString);
+      } catch (e) {
+        // Try MMMM d, y format (e.g., "November 25, 2025")
+        try {
+          date = DateFormat('MMMM d, y').parse(dateString);
+        } catch (e2) {
+          // Try yyyy-MM-dd format
+          try {
+            date = DateFormat('yyyy-MM-dd').parse(dateString);
+          } catch (e3) {
+            // If all parsing fails, return original string
+            return dateString;
+          }
+        }
+      }
+
+      // Format to MM/dd/yyyy
+      return DateFormat('MM/dd/yyyy').format(date);
+    } catch (e) {
+      // If any error occurs, return the original string
+      return dateString;
+    }
   }
 
   Widget _buildDetailRow({
@@ -476,6 +608,36 @@ class _ListOfStudentsState extends State<ListOfStudents> {
                               fontWeight: FontWeight.w600,
                               color: blue,
                             ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.calendar_today,
+                                color: Colors.green[700],
+                                size: 14,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _formatDateForDisplay(widget.date),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.green[700],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -758,13 +920,22 @@ class _ListOfStudentsState extends State<ListOfStudents> {
 
                               // Update student record with bounds checking
                               if (index < studentRecord.length) {
-                                // When manually checked, default to 'Present' state
+                                // When manually checked, determine if late or present
                                 if (value == true) {
-                                  studentRecord[index]['status'] = 'present';
-                                  studentRecord[index]['state'] = 'Present';
-                                  studentRecord[index]['present'] = '✓';
+                                  final now = DateTime.now();
+                                  final isLate = _isLate(now);
+
+                                  if (isLate) {
+                                    studentRecord[index]['status'] = 'late';
+                                    studentRecord[index]['state'] = 'Late';
+                                    studentRecord[index]['present'] = 'L';
+                                  } else {
+                                    studentRecord[index]['status'] = 'present';
+                                    studentRecord[index]['state'] = 'Present';
+                                    studentRecord[index]['present'] = '✓';
+                                  }
                                   studentRecord[index]['time_in'] =
-                                      _formatTime(DateTime.now());
+                                      _formatTime(now);
                                 } else {
                                   studentRecord[index]['status'] = 'absent';
                                   studentRecord[index]['state'] = 'Absent';
@@ -820,7 +991,11 @@ class _ListOfStudentsState extends State<ListOfStudents> {
                                           studentRecord[index]['state'] ==
                                               'Present'
                                       ? Colors.green[700]
-                                      : Colors.red[700],
+                                      : index < studentRecord.length &&
+                                              studentRecord[index]['state'] ==
+                                                  'Excuse'
+                                          ? Colors.purple[700]
+                                          : Colors.red[700],
                               fontWeight: FontWeight.w500,
                             ),
                           )
@@ -830,13 +1005,15 @@ class _ListOfStudentsState extends State<ListOfStudents> {
                                     studentRecord[index]['state'] ?? 'Absent',
                                 isExpanded: true,
                                 underline: Container(),
-                                items: ['Present', 'Late', 'Absent']
+                                items: ['Present', 'Late', 'Absent', 'Excuse']
                                     .map((String value) {
                                   Color textColor;
                                   if (value == 'Late') {
                                     textColor = Colors.orange[700]!;
                                   } else if (value == 'Present') {
                                     textColor = Colors.green[700]!;
+                                  } else if (value == 'Excuse') {
+                                    textColor = Colors.purple[700]!;
                                   } else {
                                     textColor = Colors.red[700]!;
                                   }
@@ -879,13 +1056,17 @@ class _ListOfStudentsState extends State<ListOfStudents> {
                                           studentRecord[index]['status'] =
                                               'late';
                                           studentRecord[index]['present'] = 'L';
+                                        } else if (newValue == 'Excuse') {
+                                          studentRecord[index]['status'] =
+                                              'excuse';
+                                          studentRecord[index]['present'] = 'E';
                                         } else {
                                           studentRecord[index]['status'] =
                                               'present';
                                           studentRecord[index]['present'] = '✓';
                                         }
 
-                                        // Record time when marking as present/late
+                                        // Record time when marking as present/late/excuse
                                         if (studentRecord[index]['time_in'] ==
                                                 null ||
                                             studentRecord[index]['time_in']

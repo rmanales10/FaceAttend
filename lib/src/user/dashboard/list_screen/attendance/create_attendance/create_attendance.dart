@@ -301,7 +301,15 @@ class _CreateAttendanceState extends State<CreateAttendance> {
       isLoading.value = true;
       final schedule = selectedClassSchedule.value!;
       final now = DateTime.now();
-      await _controller.createAttendance(
+      final dateStr = DateFormat('MM/dd/yyyy').format(now);
+
+      // Check if attendance already exists before creating (for message display)
+      final existingAttendanceId = await _controller.checkExistingAttendance(
+        classScheduleId: schedule['id'],
+        date: now,
+      );
+
+      final attendanceId = await _controller.createAttendance(
         subject: '${schedule['course_code']} ${schedule['subject_name']}',
         section: schedule['course_year'],
         date: now,
@@ -320,9 +328,21 @@ class _CreateAttendanceState extends State<CreateAttendance> {
       }
 
       Get.back();
-      showSuccess(
-        message: 'Attendance created successfully!',
-      );
+
+      if (attendanceId != null) {
+        // If we found existing attendance before creating, it was merged
+        if (existingAttendanceId != null) {
+          showSuccess(
+            message: 'Attendance merged with existing record for $dateStr',
+          );
+        } else {
+          showSuccess(
+            message: 'Attendance created successfully!',
+          );
+        }
+      } else {
+        _showErrorSnackbar('Failed to create attendance');
+      }
     } catch (e) {
       _showErrorSnackbar('Failed to create attendance: ${e.toString()}');
     } finally {

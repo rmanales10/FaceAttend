@@ -16,15 +16,46 @@ class CreateController extends GetxController {
     return 'attendance-$randomNumber';
   }
 
-  Future<void> createAttendance(
+  Future<String?> createAttendance(
       {required var subject,
       required var section,
       required var date,
       required var time,
       required var isAsynchronous,
       required Map<String, dynamic> classSchedule}) async {
-    String autoId = generateUniqueId();
     try {
+      // Format date to compare only the date part (without time)
+      final dateOnly = DateTime(date.year, date.month, date.day);
+      final startOfDay = Timestamp.fromDate(dateOnly);
+      final endOfDay =
+          Timestamp.fromDate(dateOnly.add(const Duration(days: 1)));
+
+      // Check if attendance already exists for the same subject and date
+      final existingQuery = await _firestore
+          .collection('classAttendance')
+          .where('class_schedule_id', isEqualTo: classSchedule['id'])
+          .where('date', isGreaterThanOrEqualTo: startOfDay)
+          .where('date', isLessThan: endOfDay)
+          .where('created_by', isEqualTo: currentUser!.uid)
+          .limit(1)
+          .get();
+
+      if (existingQuery.docs.isNotEmpty) {
+        // Attendance already exists, return the existing ID
+        final existingDoc = existingQuery.docs.first;
+        final existingId = existingDoc.id;
+        log('Attendance already exists for this subject and date. Using existing ID: $existingId');
+
+        // Update the updated_at timestamp
+        await _firestore.collection('classAttendance').doc(existingId).update({
+          'updated_at': FieldValue.serverTimestamp(),
+        });
+
+        return existingId;
+      }
+
+      // No existing attendance found, create a new one
+      String autoId = generateUniqueId();
       await _firestore.collection('classAttendance').doc(autoId).set({
         'id': autoId,
         'created_by': currentUser!.uid,
@@ -55,8 +86,11 @@ class CreateController extends GetxController {
         'present_count': 0,
         'absent_count': 0,
       }, SetOptions(merge: true));
+
+      return autoId;
     } catch (e) {
       log('error $e');
+      return null;
     }
   }
 
@@ -129,6 +163,36 @@ class CreateController extends GetxController {
     } catch (e) {
       log('Error fetching class schedules: $e');
       classSchedules.value = [];
+    }
+  }
+
+  // Check if attendance exists for a given class schedule and date
+  Future<String?> checkExistingAttendance({
+    required String classScheduleId,
+    required DateTime date,
+  }) async {
+    try {
+      final dateOnly = DateTime(date.year, date.month, date.day);
+      final startOfDay = Timestamp.fromDate(dateOnly);
+      final endOfDay =
+          Timestamp.fromDate(dateOnly.add(const Duration(days: 1)));
+
+      final existingQuery = await _firestore
+          .collection('classAttendance')
+          .where('class_schedule_id', isEqualTo: classScheduleId)
+          .where('date', isGreaterThanOrEqualTo: startOfDay)
+          .where('date', isLessThan: endOfDay)
+          .where('created_by', isEqualTo: currentUser!.uid)
+          .limit(1)
+          .get();
+
+      if (existingQuery.docs.isNotEmpty) {
+        return existingQuery.docs.first.id;
+      }
+      return null;
+    } catch (e) {
+      log('Error checking existing attendance: $e');
+      return null;
     }
   }
 }
