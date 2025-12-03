@@ -4,6 +4,7 @@ import 'package:app_attend/src/widgets/snackbar_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:intl/intl.dart';
 
 class ReportScreen extends StatelessWidget {
   final _controller = Get.put(ReportController());
@@ -73,7 +74,9 @@ class ReportScreen extends StatelessWidget {
                           date: '${report['date']}',
                           fileType: '${report['type']}',
                           url: '${report['url']}',
-                          id: report['attendance_id'],
+                          attendanceId: report['attendance_id'],
+                          documentId:
+                              report['id'], // Pass document ID for deletion
                         );
                       },
                     );
@@ -139,7 +142,8 @@ class ReportScreen extends StatelessWidget {
     required String date,
     required String fileType,
     required String url,
-    required String id,
+    required String attendanceId,
+    required String documentId,
   }) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -176,21 +180,22 @@ class ReportScreen extends StatelessWidget {
                 ),
                 _buildActionButton(Icons.download, Colors.green, () {
                   final String downloadUrl =
-                      'https://ustp-face-attend.site/report-download-public?attendanceId=$id';
+                      'https://ustp-face-attend.site/report-download-public?attendanceId=$attendanceId';
                   final Uri downloadLink = Uri.parse(downloadUrl);
                   launchUrl(downloadLink, mode: LaunchMode.externalApplication);
                 }),
                 SizedBox(width: 10),
                 _buildActionButton(Icons.delete, Colors.red, () {
-                  _showDeleteConfirmation(id);
+                  _showDeleteConfirmation(documentId);
                 }),
               ],
             ),
             SizedBox(height: 10),
-            Row(
+            Wrap(
+              spacing: 10,
+              runSpacing: 8,
               children: [
-                _buildInfoChip(Icons.calendar_today, date),
-                SizedBox(width: 10),
+                _buildInfoChip(Icons.calendar_today, _formatDate(date)),
                 _buildInfoChip(Icons.file_present, fileType),
               ],
             ),
@@ -212,10 +217,48 @@ class ReportScreen extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: blue),
           SizedBox(width: 4),
-          Text(label, style: TextStyle(color: blue, fontSize: 14)),
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(color: blue, fontSize: 14),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  String _formatDate(String dateString) {
+    try {
+      // Try to parse various date formats
+      DateTime? date;
+
+      // Try parsing as "MMMM d, y" format (e.g., "December 3, 2025")
+      try {
+        date = DateFormat('MMMM d, y').parse(dateString);
+      } catch (e) {
+        // Try parsing as ISO format or other formats
+        try {
+          date = DateTime.parse(dateString);
+        } catch (e2) {
+          // Try parsing as "MM/dd/yyyy" format
+          try {
+            date = DateFormat('MM/dd/yyyy').parse(dateString);
+          } catch (e3) {
+            // If all parsing fails, return original string
+            return dateString;
+          }
+        }
+      }
+
+      // Format as mm/dd/yy
+      return DateFormat('MM/dd/yy').format(date);
+    } catch (e) {
+      // If any error occurs, return original string
+      return dateString;
+    }
   }
 
   Widget _buildActionButton(
@@ -238,11 +281,12 @@ class ReportScreen extends StatelessWidget {
     );
   }
 
-  void _showDeleteConfirmation(String id) {
+  void _showDeleteConfirmation(String documentId) {
     Get.dialog(
       AlertDialog(
-        title: Text('Confirmation'),
-        content: Text('Are you sure you want to delete?'),
+        title: Text('Delete Report'),
+        content: Text(
+            'Are you sure you want to delete this report? This action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () {
@@ -252,9 +296,13 @@ class ReportScreen extends StatelessWidget {
           ),
           TextButton(
             onPressed: () async {
-              await _controller.deleteReports(id);
-              Get.back();
-              showSuccess(message: 'Report deleted successfully!');
+              try {
+                Get.back(); // Close dialog first
+                await _controller.deleteReports(documentId);
+                showSuccess(message: 'Report deleted successfully!');
+              } catch (e) {
+                // Error is already handled in deleteReports
+              }
             },
             child: Text('Delete', style: TextStyle(color: Colors.red)),
           ),

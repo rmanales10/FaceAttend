@@ -41,7 +41,7 @@ class _DashboardState extends State<Dashboard> {
           children: [
             _buildNavItem(0, Icons.home_filled),
             _buildNavItem(1, Icons.people),
-            _buildNavItem(2, Icons.report),
+            _buildNavItem(2, Icons.history),
             _buildNavItem(3, Icons.person_2),
           ],
         ),

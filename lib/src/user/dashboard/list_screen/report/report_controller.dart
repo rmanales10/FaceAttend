@@ -41,6 +41,7 @@ class ReportController extends GetxController {
 
       reports.value = querySnapshot.docs
           .map((doc) => {
+                'id': doc.id, // Store document ID for deletion
                 'attendance_id': doc['attendance_id'],
                 'date': doc['date'],
                 'section': doc['section'],
@@ -76,7 +77,14 @@ class ReportController extends GetxController {
     }
   }
 
-  Future<void> deleteReports(String id) async {
-    await _firestore.collection('reports').doc(id).delete();
+  Future<void> deleteReports(String documentId) async {
+    try {
+      await _firestore.collection('reports').doc(documentId).delete();
+      // Refresh the reports list after deletion
+      await getReports();
+    } catch (e) {
+      showError(message: 'Failed to delete report: $e');
+      rethrow;
+    }
   }
 }

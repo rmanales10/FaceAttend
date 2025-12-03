@@ -1,4 +1,5 @@
 import 'dart:developer';
+import 'package:app_attend/src/user/dashboard/list_screen/attendance/attendance_screen/attendance_controller.dart';
 import 'package:app_attend/src/user/dashboard/list_screen/attendance/student_list/list_controller.dart';
 import 'package:app_attend/src/user/dashboard/list_screen/profile/profile_controller.dart';
 import 'package:app_attend/src/widgets/color_constant.dart';
@@ -44,6 +45,7 @@ class _ListOfStudentsState extends State<ListOfStudents> {
 
   Map<String, dynamic>? attendanceData;
   int lateMinutes = 30; // Default late minutes
+  bool _isSubmitting = false; // Loading state for submit button
 
   @override
   void initState() {
@@ -745,50 +747,105 @@ class _ListOfStudentsState extends State<ListOfStudents> {
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: !widget.isSubmitted
-                        ? () async {
-                            await _profileController.fetchUserInfo();
-                            await _controller.addAttendanceStudentRecord(
-                              attendanceId: widget.attendanceId,
-                              code: widget.subject.split(' ')[0],
-                              datenow: widget.date,
-                              room: '',
-                              schedule: widget.date,
-                              studentRecord: studentRecord,
-                              subject: widget.subject,
-                              teacher: _profileController.userInfo['fullname'],
-                              section: widget.section,
-                            );
-                            Get.back();
-                            showSuccess(
-                                message: 'Attendance submitted successfully!');
-                          }
+                    onPressed: _isSubmitting
+                        ? null
                         : () async {
-                            // Save report to Firebase
-                            await _controller.saveReportToFirebase(
-                              attendanceId: widget.attendanceId,
-                              subject: widget.subject,
-                              section: widget.section,
-                              date: widget.date,
-                            );
-                            Get.back();
-                            showSuccess(message: 'Report saved successfully!');
+                            setState(() {
+                              _isSubmitting = true;
+                            });
+
+                            try {
+                              if (!widget.isSubmitted) {
+                                await _profileController.fetchUserInfo();
+                                await _controller.addAttendanceStudentRecord(
+                                  attendanceId: widget.attendanceId,
+                                  code: widget.subject.split(' ')[0],
+                                  datenow: widget.date,
+                                  room: '',
+                                  schedule: widget.date,
+                                  studentRecord: studentRecord,
+                                  subject: widget.subject,
+                                  teacher:
+                                      _profileController.userInfo['fullname'],
+                                  section: widget.section,
+                                );
+
+                                // Refresh attendance list after submission
+                                try {
+                                  if (Get.isRegistered<
+                                      AttendanceController>()) {
+                                    await Get.find<AttendanceController>()
+                                        .refreshAttendance();
+                                  }
+                                } catch (e) {
+                                  log('Error refreshing attendance: $e');
+                                }
+
+                                Get.back();
+                                showSuccess(
+                                    message:
+                                        'Attendance submitted successfully!');
+                              } else {
+                                // Save report to Firebase
+                                await _controller.saveReportToFirebase(
+                                  attendanceId: widget.attendanceId,
+                                  subject: widget.subject,
+                                  section: widget.section,
+                                  date: widget.date,
+                                );
+
+                                // Refresh attendance list after saving report
+                                try {
+                                  if (Get.isRegistered<
+                                      AttendanceController>()) {
+                                    await Get.find<AttendanceController>()
+                                        .refreshAttendance();
+                                  }
+                                } catch (e) {
+                                  log('Error refreshing attendance: $e');
+                                }
+
+                                Get.back();
+                                showSuccess(
+                                    message: 'Report saved successfully!');
+                              }
+                            } catch (e) {
+                              showError(message: 'Error: ${e.toString()}');
+                            } finally {
+                              if (mounted) {
+                                setState(() {
+                                  _isSubmitting = false;
+                                });
+                              }
+                            }
                           },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: blue,
+                      backgroundColor:
+                          _isSubmitting ? blue.withOpacity(0.6) : blue,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
                       elevation: 2,
+                      disabledBackgroundColor: blue.withOpacity(0.6),
                     ),
-                    child: Text(
-                      !widget.isSubmitted ? 'Submit' : 'Save Report',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    child: _isSubmitting
+                        ? SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : Text(
+                            !widget.isSubmitted ? 'Submit' : 'Save Report',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 24),
