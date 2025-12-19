@@ -250,13 +250,53 @@ class _SubjectAttendanceDetailsState extends State<SubjectAttendanceDetails> {
           final userId = FirebaseAuth.instance.currentUser?.uid;
 
           if (userId != null) {
-            reportId =
-                'complete_${attendanceIds.join('_')}_${DateTime.now().millisecondsSinceEpoch}';
+            // Create a deterministic report ID based on sorted attendance IDs
+            // This ensures the same set of attendance IDs always maps to the same report
+            final sortedIds = List<String>.from(attendanceIds)..sort();
+            final attendanceIdsHash = sortedIds.join('_');
 
-            await FirebaseFirestore.instance
+            // Create a deterministic ID: complete_subject_section_attendanceIdsHash
+            // This will be the same for the same subject, section, and attendance IDs
+            final subjectKey =
+                widget.subject.replaceAll(' ', '_').toLowerCase();
+            final sectionKey = section.replaceAll(' ', '_').toLowerCase();
+            reportId =
+                'complete_${subjectKey}_${sectionKey}_${attendanceIdsHash.hashCode.abs()}';
+
+            // Check if a report with the same attendance IDs already exists
+            final existingReportQuery = await FirebaseFirestore.instance
                 .collection('reports')
-                .doc(reportId)
-                .set({
+                .where('user_id', isEqualTo: userId)
+                .where('type', isEqualTo: 'Complete Attendance Report')
+                .where('subject', isEqualTo: widget.subject)
+                .where('section', isEqualTo: section)
+                .get();
+
+            // Check if any existing report has the same attendance IDs
+            bool reportExists = false;
+            String? existingReportId;
+
+            for (var doc in existingReportQuery.docs) {
+              final existingAttendanceIds =
+                  (doc.data()['attendance_id'] as String?)
+                          ?.split(',')
+                          .where((id) => id.isNotEmpty)
+                          .toList() ??
+                      [];
+
+              // Sort and compare
+              final existingSorted = List<String>.from(existingAttendanceIds)
+                ..sort();
+              if (existingSorted.length == sortedIds.length &&
+                  existingSorted.every((id) => sortedIds.contains(id))) {
+                reportExists = true;
+                existingReportId = doc.id;
+                break;
+              }
+            }
+
+            // If report exists, update it; otherwise create new one
+            final reportData = {
               'attendance_id':
                   attendanceIds.join(','), // Store all IDs as comma-separated
               'subject': widget.subject,
@@ -265,11 +305,27 @@ class _SubjectAttendanceDetailsState extends State<SubjectAttendanceDetails> {
               'type': 'Complete Attendance Report',
               'url': '', // No URL since it's saved locally
               'user_id': userId,
-              'created_at': FieldValue.serverTimestamp(),
+              'updated_at': FieldValue.serverTimestamp(),
               'date_range': records.length > 1
                   ? '${records.length} dates'
                   : DateFormat('MMMM d, y').format(DateTime.now()),
-            }, SetOptions(merge: true));
+            };
+
+            if (reportExists && existingReportId != null) {
+              // Update existing report
+              await FirebaseFirestore.instance
+                  .collection('reports')
+                  .doc(existingReportId)
+                  .update(reportData);
+              reportId = existingReportId; // Use existing ID
+            } else {
+              // Create new report with deterministic ID
+              reportData['created_at'] = FieldValue.serverTimestamp();
+              await FirebaseFirestore.instance
+                  .collection('reports')
+                  .doc(reportId)
+                  .set(reportData, SetOptions(merge: true));
+            }
           }
         } catch (e) {
           // Log error but continue with file save

@@ -31,7 +31,7 @@ class WelcomeScreen extends StatelessWidget {
                   children: [
                     SizedBox(height: screenHeight * 0.05),
                     Text(
-                      'TapAttend',
+                      'FaceAttend',
                       style: TextStyle(
                         fontSize: screenWidth * 0.06, // Responsive font size
                         fontWeight: FontWeight.bold,
